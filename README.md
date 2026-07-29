@@ -5,6 +5,25 @@ Active competition workspace for the
 The task is instance segmentation of solar filaments in 2048 × 2048 grayscale
 GONG H-alpha observations.
 
+## Challenge overview
+
+The Solar Filament Segmentation Challenge 2026 is a computer-vision competition
+focused on identifying individual solar filaments in full-disk H-alpha images.
+Solar filaments appear as dark, elongated structures against the solar disk and
+can be thin, fragmented, and morphologically complex, making accurate instance
+segmentation more difficult than ordinary foreground detection.
+
+Participants must predict a separate binary mask for every filament instance in
+each test observation. Predictions are submitted as COCO compressed
+run-length-encoded masks at the original 2048 × 2048 image resolution. The
+competition evaluates segmentation overlap and instance behavior, including
+Dice, IoU, missed or extra detections, fragmentation, and merged instances.
+
+This repository provides a reproducible pipeline for data validation, grouped
+cross-validation, model experiments, instance-aware post-processing, diagnostic
+evaluation, and submission generation while maintaining strict separation
+between training and test observations.
+
 ## Current status
 
 - Kaggle access and competition entry are verified through the configured CLI.
@@ -13,10 +32,14 @@ GONG H-alpha observations.
   JPEGs, with no exact filename or SHA-256 overlap between the splits.
 - The COCO JSON contains 1,154 annotation-set image records for 707 physical
   observations and 8,199 filament annotations.
-- The isolated Python environment, repository safeguards, and 23 synthetic tests
+- The isolated Python environment, repository safeguards, and synthetic tests
   are ready.
-- No model experiment, Kaggle notebook push, leaderboard submission, rank, or
-  score is claimed yet.
+- Experiment 001 trained a small U-Net from scratch on one fixed grouped fold
+  and reached 0.6403 semantic Dice at 512 × 512. This is a local diagnostic, not
+  the organizer's complete instance-matching score.
+- The first mechanically validated submission was accepted by Kaggle as
+  reference `55089873` and remains pending. No leaderboard score or rank is
+  claimed.
 
 ## Competition essentials
 
@@ -69,6 +92,7 @@ and submissions are ignored by Git.
 configs/                         Versioned experiment settings
 data/README.md                   Local and Kaggle data locations
 docs/                            Rules, validation policy, experiment registry
+kaggle/                          Self-contained private-kernel source
 outputs/README.md                Generated-output conventions
 scripts/                         Setup, access, download, and validation commands
 src/solar_filament_segmentation/ Reusable data, metric, RLE, and submission code

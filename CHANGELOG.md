@@ -17,3 +17,8 @@
 - Added YAML experiment configuration, COCO data helpers, Dice/IoU diagnostics,
   COCO compressed-RLE helpers, submission validation, and synthetic tests.
 - Added repository-wide credential, data, model, output, and submission ignores.
+- Added a self-contained, private Kaggle GPU baseline that trains a small U-Net
+  from scratch, preserves grouped validation, separates connected-component
+  instances, and generates a mechanically validated submission.
+- Ran experiment 001 and recorded its train-only fold fingerprint and semantic
+  validation diagnostic without treating it as the organizer's matching score.
