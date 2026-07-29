@@ -1,0 +1,19 @@
+# Changelog
+
+## Unreleased
+
+### Added
+
+- Initialized the local Git repository for the Solar Filament Segmentation
+  Challenge 2026.
+- Documented the authenticated official competition pages, data inventory,
+  evaluation rubric, submission format, timeline, and rules.
+- Added safe Kaggle access and data-download scripts.
+- Downloaded and structurally audited the complete official competition archive
+  in Git-ignored storage: 707 training images, 180 test images, 1,154 COCO image
+  records, and 8,199 filament annotations.
+- Verified all images are 2048 × 2048 grayscale JPEGs and found no exact
+  filename or SHA-256 overlap within or across train/test splits.
+- Added YAML experiment configuration, COCO data helpers, Dice/IoU diagnostics,
+  COCO compressed-RLE helpers, submission validation, and synthetic tests.
+- Added repository-wide credential, data, model, output, and submission ignores.

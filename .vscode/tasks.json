@@ -1,0 +1,21 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Validate workspace",
+      "type": "shell",
+      "command": "${workspaceFolder}\\scripts\\validate.ps1",
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Verify Kaggle access",
+      "type": "shell",
+      "command": "${workspaceFolder}\\scripts\\verify_kaggle_access.ps1",
+      "problemMatcher": []
+    }
+  ]
+}

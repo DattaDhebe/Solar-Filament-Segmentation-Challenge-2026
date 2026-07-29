@@ -1,0 +1,71 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+
+# Editors and notebooks
+.idea/
+.ipynb_checkpoints/
+*.code-workspace
+
+# Credentials and local configuration
+.env
+.env.*
+!.env.example
+.kaggle/
+**/.kaggle/
+kaggle.json
+**/kaggle.json
+access_token
+access_token.*
+**/access_token
+**/access_token.*
+
+# Competition data and archives
+data/raw/
+data/interim/
+data/processed/
+data/external/
+*.zip
+*.7z
+*.tar
+*.tar.gz
+
+# Generated experiment artifacts
+outputs/*
+!outputs/README.md
+artifacts/
+checkpoints/
+*.ckpt
+*.pt
+*.pth
+*.onnx
+*.engine
+*.npy
+*.npz
+*.pkl
+*.pickle
+metrics*.json
+oof*.csv
+predictions*.csv
+submission*.csv
+submission*.zip
+
+# Generated Kaggle metadata and diagnostics
+kaggle/kernel-metadata.json
+kaggle/*-kernel-metadata.json
+kernel.log
+*.log
+
+# Operating systems
+.DS_Store
+Thumbs.db
+desktop.ini
