@@ -1,0 +1,1617 @@
+# Project execution history
+
+This is the durable, human-readable command and decision log for the Solar
+Filament Segmentation Challenge 2026 entry. It records material commands,
+validation results, Kaggle runs, submissions, experiment diagnostics, rule
+checks, and Git commits through 2026-07-30.
+
+## Safety and scope
+
+- This file provides a detailed engineering decision journal: observations,
+  alternatives, decisions, evidence, commands, and outcomes. It does not contain
+  private hidden chain-of-thought or unrecorded internal reasoning.
+- Commands are shown relative to the repository root.
+- Kaggle is used only through the configured CLI as an opaque authenticated
+  client. Credential files and token values are never read or logged.
+- Competition data, model weights, raw metrics, predictions, masks, kernel
+  metadata, and submission CSVs remain Git-ignored.
+- Long raw Kaggle logs and generated metadata are referenced by local path
+  rather than copied into Git.
+- Kaggle kernel pushes and competition submissions were performed only after
+  explicit user approval.
+- Kaggle submission timestamps below are the timestamps returned by the CLI.
+- Local Dice and IoU values are diagnostics, not claims of exact organizer
+  evaluator parity.
+
+## Current verified state
+
+| Experiment | Kaggle kernel | Submission | Public score |
+| --- | --- | --- | ---: |
+| 001 | `dattadhebe/solar-filament-first-submission`, version 1 | `55089873` | 0.52 |
+| 002 | `dattadhebe/solar-filament-overnight-ensemble`, version 1 | `55099193` | 0.62 |
+| 003 | `dattadhebe/solar-filament-oof-tta-refinement`, version 1 | `55107032` | 0.66 |
+
+Latest submission-status command:
+
+```powershell
+.\.venv\Scripts\kaggle.exe competitions submissions `
+  -c filament-segmentation-2026 --page-size 10
+```
+
+Verified output on 2026-07-30:
+
+```text
+55107032  experiment-003-submission.csv  COMPLETE  0.66
+55099193  experiment-002-submission.csv  COMPLETE  0.62
+55089873  submission.csv                 COMPLETE  0.52
+```
+
+No private score or leaderboard rank is claimed.
+
+## Repository initialization and data audit
+
+The workspace was initialized with fixed competition invariants, safe ignore
+rules, data/schema helpers, RLE validation, submission checks, and synthetic
+tests.
+
+Material commands:
+
+```powershell
+.\scripts\setup.ps1
+.\scripts\verify_kaggle_access.ps1
+.\scripts\download_competition_data.ps1
+.\.venv\Scripts\python.exe .\scripts\inspect_data.py
+.\scripts\validate.ps1
+```
+
+Verified inventory:
+
+```text
+COCO image records: 1,154
+Physical annotated observations: 707
+Duplicate annotator image records: 447
+Filament annotations: 8,199
+Training JPEGs: 707
+Test JPEGs: 180
+Image size: 2048 x 2048
+Image mode: grayscale L
+Train/test shared stems: 0
+Train/test shared exact hashes: 0
+```
+
+Validation grouping is always the physical observation `file_name`. The fixed
+five-fold assignment fingerprint is:
+
+```text
+69a31d113fd4e4cea63f1a072d94dd0dea2c1432c18d349d8a2575c5d1915aa7
+```
+
+Generated data audit:
+
+```text
+outputs/setup/data-audit.json
+```
+
+## Experiment 001: first end-to-end baseline
+
+Versioned configuration:
+
+```text
+configs/experiment-001-first-submission.yaml
+```
+
+Design:
+
+- one fixed grouped validation fold;
+- 512 x 512 grayscale input;
+- small U-Net trained from scratch;
+- no external labels or pretrained weights;
+- semantic foreground prediction;
+- connected-component instance separation;
+- canonical 2048 x 2048 COCO compressed RLE output.
+
+Local validation:
+
+```powershell
+.\.venv\Scripts\python.exe -m ruff format --check .
+.\.venv\Scripts\python.exe -m ruff check .
+.\.venv\Scripts\python.exe -m pytest
+.\scripts\validate.ps1
+```
+
+Kernel metadata was initialized without exposing credentials:
+
+```powershell
+.\.venv\Scripts\kaggle.exe kernels init -p kaggle
+```
+
+Private GPU launch and status:
+
+```powershell
+.\.venv\Scripts\kaggle.exe kernels push `
+  -p kaggle --accelerator NvidiaTeslaT4
+
+.\.venv\Scripts\kaggle.exe kernels status `
+  dattadhebe/solar-filament-first-submission
+```
+
+Kaggle reported:
+
+```text
+Kernel version 1 successfully pushed.
+KernelWorkerStatus.RUNNING
+KernelWorkerStatus.COMPLETE
+```
+
+Artifact download:
+
+```powershell
+.\.venv\Scripts\kaggle.exe kernels output `
+  dattadhebe/solar-filament-first-submission/1 `
+  -p outputs\kaggle\experiment-001-v1
+```
+
+Run results:
+
+| Diagnostic | Result |
+| --- | ---: |
+| Runtime | 300.403 seconds |
+| Best grouped validation semantic Dice | 0.640299 |
+| Submission instances | 1,970 |
+| Test images with predictions | 177 of 180 |
+| RLE validation | 1,970 canonical masks passed |
+
+Additional mechanical checks:
+
+```text
+Header: filament_id,segmentation_rle
+Empty RLE values: 0
+Duplicate filament IDs: 0
+Mask-area pixels, min/median/max: 64 / 576 / 17,504
+Instances per image, min/median/max: 0 / 11 / 29
+Tracebacks: 0
+NaNs: 0
+CUDA out-of-memory errors: 0
+```
+
+Submission allowance and upload:
+
+```powershell
+.\.venv\Scripts\kaggle.exe competitions submission-limits `
+  filament-segmentation-2026 --json
+
+.\.venv\Scripts\kaggle.exe competitions submit `
+  -c filament-segmentation-2026 `
+  -f outputs\kaggle\experiment-001-v1\submission.csv `
+  -m "experiment-001 first submission small U-Net fold-0 baseline"
+```
+
+The upload reached 100%, after which the CLI returned:
+
+```text
+Expecting value: line 1 column 1 (char 0)
+```
+
+The command was not retried blindly. A read-only submission-list check verified
+that Kaggle had accepted reference `55089873`. Its final public score is 0.52.
+
+Raw local artifacts:
+
+```text
+outputs/kaggle/experiment-001-v1/experiment-001-run-metadata.json
+outputs/kaggle/experiment-001-v1/solar-filament-first-submission.log
+outputs/kaggle/experiment-001-v1/submission.csv
+outputs/kaggle/experiment-001-v1/experiment-001-model.pt
+```
+
+## Experiment 002: five-fold 1024 ensemble
+
+Versioned configuration:
+
+```text
+configs/experiment-002-overnight-ensemble.yaml
+```
+
+Design:
+
+- five immutable grouped folds;
+- 1024 x 1024 grayscale input;
+- five small U-Nets with 24 base channels, trained from scratch;
+- up to 24 epochs per fold with early stopping;
+- geometric and intensity augmentation;
+- five-model probability ensemble;
+- 27 post-processing candidates selected only from grouped OOF predictions;
+- local greedy instance matching with penalties for missed and extra instances.
+
+### Experiment-002 decision journal
+
+This is the engineering rationale that led from experiment 001 to experiment
+002. It is reconstructed from the versioned configuration, source diff, run
+metadata, and Kaggle log.
+
+| Observation or constraint | Decision | Why | Evidence or outcome |
+| --- | --- | --- | --- |
+| Experiment 001 used only fold 0 and scored 0.52 publicly. | Train all five fixed folds. | A single fold leaves most labeled observations unused for model fitting and provides a high-variance estimate. Five grouped models use every observation for training in four folds and validation in one fold. | All five folds completed; mean fold semantic Dice was 0.648139. |
+| Multiple annotation-set IDs can refer to the same JPEG. | Continue grouping by physical `file_name`, never annotation ID. | Splitting duplicate annotation records across train and validation would leak the same solar observation. | The fold fingerprint remained `69a31d...5aa7` and all 1,154 annotation records stayed grouped by 707 observations. |
+| Thin filaments lose detail at the 512 resolution used by experiment 001. | Increase model input to 1024 x 1024. | This preserves four times as many input pixels while remaining feasible on a T4 with a small U-Net and batch size 2. | The five-fold T4 run completed without an out-of-memory error. |
+| The user had an overnight Kaggle GPU window. | Allow 24 epochs per fold, require at least 10, and use patience-5 early stopping. | This makes productive use of the time window while allowing a plateaued fold to stop. | Best epochs were 23, 10, 24, 21, and 22; runtime was 4.553 hours. |
+| The competition wording restricts other ground-truth metadata. | Train from scratch with no external labels and no pretrained weights. | This is the conservative rule-compliant choice and avoids hidden-label leakage from public MAGFiLO annotations. | Both safeguards are explicit in YAML and covered by tests. |
+| One semantic model is sensitive to fold-specific variation. | Average probability maps from all five fold models. | A probability ensemble generally reduces fold variance before instance separation. | Test inference used all five saved checkpoints and produced predictions for 179 of 180 images. |
+| Semantic Dice alone does not measure split/merged instances. | Generate instances with connected components and evaluate grouped OOF instance diagnostics. | The submission requires individual filament instances, so semantic foreground cannot be the final output. | The log records matched Dice, matched IoU, missed/extra instances, and one-to-many/many-to-one behavior. |
+| The experiment-001 post-processing values were not justified across all folds. | Search 27 combinations of threshold, closing kernel, and minimum area on OOF predictions only. | Post-processing must be selected without looking at test images or leaderboard response. | OOF selected threshold 0.60, closing 5, and minimum area 32. |
+| Predictions included many small fragments. | Use a penalized diagnostic that includes both missed and extra predictions. | Matched-only Dice can look good while ignoring false components. Penalizing both sides makes fragmentation visible. | Matched Dice was 0.704663, but penalized Dice was only 0.430385 and extra instances totaled 4,432. This directly motivated experiment 003. |
+
+Rejected or deferred alternatives:
+
+- Full 2048 x 2048 training was not selected because five-fold training at that
+  resolution would substantially increase T4 memory use and runtime before the
+  1024 baseline was understood.
+- External MAGFiLO labels were rejected because they include hidden test
+  observations and the organizer prohibited using that additional ground truth.
+- Supervised pretrained weights were deferred under the same conservative
+  interpretation of the rules.
+- Leaderboard-driven threshold tuning was rejected because it would tune on
+  hidden test feedback and the public metric was known to reward empty masks.
+- Collapsing all foreground into one mask was rejected because the task and
+  submission format require filament instances.
+
+### Experiment-002 command record
+
+The material commands were:
+
+```powershell
+# Review the experiment configuration and shared kernel source.
+Get-Content configs\experiment-002-overnight-ensemble.yaml
+Get-Content kaggle\first_submission.py
+
+# Run formatting, Ruff, synthetic tests, and the repository/data safety audit.
+.\scripts\validate.ps1
+git diff --check
+
+# After explicit user approval, launch the private T4 kernel.
+.\.venv\Scripts\kaggle.exe kernels push `
+  -p kaggle --accelerator NvidiaTeslaT4 --timeout 43200
+
+# Check startup and final state without changing the run.
+.\.venv\Scripts\kaggle.exe kernels status `
+  dattadhebe/solar-filament-overnight-ensemble
+
+# Download the completed, ignored artifacts.
+.\.venv\Scripts\kaggle.exe kernels output `
+  dattadhebe/solar-filament-overnight-ensemble/1 `
+  -p outputs\kaggle\experiment-002-v1
+
+# Inspect the run record and training log.
+Get-Content `
+  outputs\kaggle\experiment-002-v1\experiment-002-run-metadata.json
+Get-Content `
+  outputs\kaggle\experiment-002-v1\solar-filament-overnight-ensemble.log
+
+# Re-run repository validation and validate every candidate RLE as described
+# in "Full submission-validation command pattern" below.
+.\scripts\validate.ps1
+
+# After artifact review and explicit submission approval, submit the candidate.
+.\.venv\Scripts\kaggle.exe competitions submit `
+  -c filament-segmentation-2026 `
+  -f outputs\kaggle\experiment-002-v1\experiment-002-submission.csv `
+  -m "experiment-002 five-fold 1024 U-Net ensemble OOF-selected postprocessing"
+
+# Verify acceptance and score instead of inferring either from the submit call.
+.\.venv\Scripts\kaggle.exe competitions submissions `
+  -c filament-segmentation-2026 --page-size 10
+```
+
+Some read-only inspections were issued as combined PowerShell commands during
+the interactive session. They are written one per line above so the workflow is
+reproducible. Credential-file commands are deliberately absent because no
+credential file was read.
+
+### Files changed for experiment 002 and why
+
+| File or generated location | Change | Reason |
+| --- | --- | --- |
+| `configs/experiment-002-overnight-ensemble.yaml` | Added the complete experiment-002 configuration. | Makes folds, seeds, resolution, model size, training budget, loss, augmentation, post-processing grid, metrics, and output schema reviewable and reproducible. |
+| `kaggle/first_submission.py` | Expanded the experiment-001 script into a five-fold trainer with OOF probability collection, instance diagnostics, grid selection, five-model test ensembling, run metadata, and strict submission writing. | One self-contained script is directly executable by a private Kaggle script kernel without relying on a package install or internet access. |
+| `kaggle/kernel-metadata.json` | Temporarily pointed at the private `solar-filament-overnight-ensemble` T4 kernel with competition data and internet disabled. | Kaggle uses this ignored control file to choose the private kernel, accelerator, and inputs. It is not committed because it contains account-specific operational metadata. |
+| `tests/test_kaggle_kernel.py` | Extended synthetic checks for full grouped-fold coverage and disabled external assets. | Prevents a future edit from silently dropping folds or enabling prohibited data/model sources. |
+| `README.md` | Added the experiment-002 design, diagnostics, verified score, and public-metric warning. | Keeps the repository overview accurate without claiming rank or private score. |
+| `docs/experiments.md` | Added experiment 002 to the concise experiment registry. | Records the promotion decision and the remaining over-segmentation problem. |
+| `docs/external-data.md` | Strengthened the MAGFiLO leakage warning and organizer-rule interpretation. | Explains why apparently available public labels were not used. |
+| `CHANGELOG.md` | Recorded the five-fold ensemble and OOF-selection capability. | Provides a compact repository-level history. |
+| `outputs/kaggle/experiment-002-v1/` | Generated five weights, raw Kaggle log, metadata, and the candidate CSV. | These are necessary run artifacts for review and reproducibility checks but are ignored and never committed. |
+
+Git provenance note: the experiment-002 and experiment-003 source work was
+committed together in `74a00ba` (`feat: add five-fold refinement pipeline`).
+The experiment-002 YAML is preserved, but the shared
+`kaggle/first_submission.py` was then evolved in place into the experiment-003
+entry script. Therefore, the current Git tree does not pretend to be a separate
+byte-for-byte snapshot of the Python script pushed for experiment 002. The raw
+experiment-002 Kaggle log and metadata remain in the ignored output directory.
+
+Private GPU launch and checks:
+
+```powershell
+.\.venv\Scripts\kaggle.exe kernels push `
+  -p kaggle --accelerator NvidiaTeslaT4 --timeout 43200
+
+.\.venv\Scripts\kaggle.exe kernels status `
+  dattadhebe/solar-filament-overnight-ensemble
+```
+
+Kaggle reported version 1 as `RUNNING` on three startup checks and later
+`COMPLETE`.
+
+Artifact download:
+
+```powershell
+.\.venv\Scripts\kaggle.exe kernels output `
+  dattadhebe/solar-filament-overnight-ensemble/1 `
+  -p outputs\kaggle\experiment-002-v1
+```
+
+Run results:
+
+| Diagnostic | Result |
+| --- | ---: |
+| Runtime | 4.553 hours |
+| Mean best-fold semantic Dice | 0.648139 |
+| Penalized OOF instance Dice | 0.430385 |
+| Mean matched-instance Dice | 0.704663 |
+| Mean matched-instance IoU | 0.563493 |
+| Matched instances | 7,166 |
+| Missed instances | 1,033 |
+| Extra instances | 4,432 |
+| One-to-many relations | 651 |
+| Many-to-one relations | 126 |
+| Submission instances | 1,771 |
+
+Fold results:
+
+| Fold | Best epoch | Best semantic Dice |
+| ---: | ---: | ---: |
+| 0 | 23 | 0.653758 |
+| 1 | 10 | 0.641641 |
+| 2 | 24 | 0.643388 |
+| 3 | 21 | 0.652332 |
+| 4 | 22 | 0.649573 |
+
+OOF-selected processing:
+
+```text
+probability threshold: 0.60
+closing kernel: 5
+minimum component area at model resolution: 32
+```
+
+Submission validation:
+
+```text
+1,771 canonical 2048 x 2048 RLE masks passed
+Known test images: 180
+Images with predictions: 179
+Empty RLE values: 0
+Duplicate filament IDs: 0
+Mask-area pixels, min/median/max: 128 / 828 / 17,452
+Instances per image, min/median/max: 0 / 10 / 23
+Tracebacks: 0
+NaNs: 0
+CUDA out-of-memory errors: 0
+```
+
+Submission command:
+
+```powershell
+.\.venv\Scripts\kaggle.exe competitions submit `
+  -c filament-segmentation-2026 `
+  -f outputs\kaggle\experiment-002-v1\experiment-002-submission.csv `
+  -m "experiment-002 five-fold 1024 U-Net ensemble OOF-selected postprocessing"
+```
+
+Kaggle accepted reference `55099193`. Its final public score is 0.62.
+
+Raw local artifacts:
+
+```text
+outputs/kaggle/experiment-002-v1/experiment-002-run-metadata.json
+outputs/kaggle/experiment-002-v1/solar-filament-overnight-ensemble.log
+outputs/kaggle/experiment-002-v1/experiment-002-submission.csv
+outputs/kaggle/experiment-002-v1/experiment-002-fold-0.pt
+outputs/kaggle/experiment-002-v1/experiment-002-fold-1.pt
+outputs/kaggle/experiment-002-v1/experiment-002-fold-2.pt
+outputs/kaggle/experiment-002-v1/experiment-002-fold-3.pt
+outputs/kaggle/experiment-002-v1/experiment-002-fold-4.pt
+```
+
+## Competition-rule and leaderboard investigation
+
+Authenticated official file inventory:
+
+```powershell
+.\.venv\Scripts\kaggle.exe competitions files `
+  filament-segmentation-2026 --page-size 200 --format json
+```
+
+The official competition source contains only:
+
+```text
+707 training JPEGs
+180 test JPEGs
+1 training annotation JSON
+```
+
+There is no second official labeled dataset.
+
+Authenticated evaluation and rules:
+
+```powershell
+.\.venv\Scripts\kaggle.exe competitions pages `
+  filament-segmentation-2026 list filament-segmentation-2026 `
+  --content --page-name evaluation --format json
+
+.\.venv\Scripts\kaggle.exe competitions pages `
+  filament-segmentation-2026 list filament-segmentation-2026 `
+  --content --page-name rules --format json
+```
+
+Authenticated leaderboard and discussion checks:
+
+```powershell
+.\.venv\Scripts\kaggle.exe competitions leaderboard `
+  filament-segmentation-2026 --show --page-size 20
+
+.\.venv\Scripts\kaggle.exe competitions topics list `
+  filament-segmentation-2026 --format json
+
+.\.venv\Scripts\kaggle.exe competitions topics show 728474 --format json
+.\.venv\Scripts\kaggle.exe competitions topics show 729809 --format json
+.\.venv\Scripts\kaggle.exe competitions topics show 729396 --format json
+.\.venv\Scripts\kaggle.exe competitions topics show 728062 --format json
+```
+
+Verified findings:
+
+- Generic external data is allowed only when public and reasonably accessible.
+- Inference may use only the supplied H-alpha test images.
+- Models may not use other ground-truth metadata for training.
+- The organizer clarified that MAGFiLO ground truth must be limited to
+  competition-provided annotations; otherwise the submission is disregarded.
+- All 180 test filenames reportedly have labels in the public MAGFiLO release,
+  so those public labels would leak every hidden target.
+- Participants demonstrated that empty or nearly empty submissions can score
+  above 0.9 and even 1.0 because of a public-metric defect.
+- The organizer states that the public leaderboard is only a preliminary
+  filter and that segmentation quality, reproducibility, and the full
+  quantitative/qualitative rubric determine awards.
+
+Decision:
+
+```text
+Do not use public MAGFiLO annotations.
+Do not exploit the empty-mask score.
+Use official labels only.
+Select model and post-processing changes with grouped OOF diagnostics.
+```
+
+A failed inventory attempt used unsupported `--json`; it was corrected to
+`--format json`. Failed page-command ordering attempts were corrected to the
+working syntax recorded above.
+
+## Experiment 003: consensus fine-tuning, TTA, and refinement
+
+Versioned configuration:
+
+```text
+configs/experiment-003-oof-tta-refinement.yaml
+```
+
+Design:
+
+- resume all five experiment-002 competition-trained checkpoints;
+- one soft foreground target per physical training observation, averaging its
+  independent annotator masks;
+- preserve each annotator record separately for grouped OOF evaluation;
+- up to 18 additional epochs per fold at learning rate 0.0002;
+- early stopping after at least eight epochs;
+- four-way test-time augmentation;
+- five-model ensemble;
+- 72 validation-only post-processing candidates;
+- component area and mean-confidence filtering;
+- official competition labels only.
+
+### Experiment-003 decision journal
+
+This is the engineering rationale that led from experiment 002 to experiment
+003.
+
+| Observation or constraint | Decision | Why | Evidence or outcome |
+| --- | --- | --- | --- |
+| Experiment 002 improved the public score from 0.52 to 0.62, but its penalized OOF instance Dice was 0.430385. | Keep the five-fold foundation and target the instance errors rather than replacing the whole pipeline. | The semantic model had useful signal; the larger gap was between matched quality and penalized instance quality. | Experiment 003 increased penalized OOF Dice to 0.490129 and public score to 0.66. |
+| Experiment 002 produced 4,432 extra instances, far more than its 1,033 misses. | Add stronger area filtering and component mean-confidence filtering. | The error profile indicated fragmentation and low-confidence false components. | Extra instances fell to 2,103 and test rows fell from 1,771 to 1,332. |
+| The same physical JPEG can have masks from multiple annotators. | Average its official annotator foreground masks into a soft consensus training target. | Treating duplicate annotations as unrelated hard targets can give contradictory supervision. A soft target preserves disagreement without leaking between folds. | Fine-tuning used 707 physical-observation targets while evaluation retained all 1,154 official annotation records. |
+| Five experiment-002 checkpoints already contained competition-only learned features. | Resume each matching fold checkpoint instead of restarting. | The user asked for more training, and continuing from rule-compliant checkpoints is more time-efficient than repeating from random initialization. | Every fold log records its `experiment-002-fold-N.pt` source. |
+| Fine-tuning from an established checkpoint can overwrite useful features. | Reduce learning rate from 0.001 to 0.0002, use at most 18 epochs, minimum 8, and patience 4. | A smaller update is appropriate for refinement and fits the available overnight GPU window. | Runtime was 2.883 hours; best fine-tuning epochs ranged from 5 to 12. |
+| Predictions may vary under flips even though the physical target should transform consistently. | Average identity, horizontal-flip, vertical-flip, and combined-flip predictions. | Four-way TTA reduces orientation-specific prediction variance using only the supplied image. | Mean semantic Dice improved from 0.651170 before TTA to 0.652722 with TTA. |
+| Experiment 002 searched only 27 post-processing settings and could not filter a component by confidence. | Search 72 OOF-only combinations, adding minimum mean probability 0.0/0.7/0.8 and larger minimum areas. | The expanded grid directly tests ways to suppress extra fragments without using test observations. | Selected threshold 0.50, closing 7, area 96, and mean confidence 0.80. |
+| Stronger filtering may trade false positives for false negatives. | Report missed and extra counts separately instead of presenting only the improved aggregate. | The tradeoff matters for scientific review and future tuning. | Extras improved by 2,329, while misses increased by 660. The log retains both facts. |
+| Public 1.00 scores were associated with a metric defect. | Continue selecting by grouped OOF instance quality, not by deleting predictions to imitate the exploit. | An empty-mask strategy would not be a legitimate segmentation improvement and could fail final qualitative/reproducibility review. | Experiment 003 produced 1,332 real, validated filament masks; no empty RLE rows were submitted. |
+
+Rejected or deferred alternatives:
+
+- Restarting five models from scratch was rejected because experiment-002
+  checkpoints were already rule-compliant and the user specifically wanted more
+  productive training.
+- Training on public MAGFiLO ground truth was rejected because it contains the
+  hidden test targets and violates the organizer clarification.
+- Selecting the confidence threshold from test-image prediction counts or the
+  leaderboard was rejected to preserve strict train/test separation.
+- More aggressive filtering was not chosen merely to reduce row count; the
+  selected setting had to win the grouped OOF penalized diagnostic.
+- A different large architecture or supervised encoder was deferred because it
+  would change several variables at once and could violate the conservative
+  pretrained-weight policy.
+
+### Experiment-003 command record
+
+The material commands were:
+
+```powershell
+# Review the new configuration, checkpoint source, and implementation.
+Get-Content configs\experiment-003-oof-tta-refinement.yaml
+Get-Content kaggle\first_submission.py
+Get-Content kaggle\kernel-metadata.json
+
+# Validate before requesting a push.
+.\scripts\validate.ps1
+git diff --check
+
+# After explicit user approval, launch the private refinement kernel.
+.\.venv\Scripts\kaggle.exe kernels push `
+  -p kaggle --accelerator NvidiaTeslaT4 --timeout 43200
+
+# Verify startup and eventual completion.
+.\.venv\Scripts\kaggle.exe kernels status `
+  dattadhebe/solar-filament-oof-tta-refinement
+
+# Download artifacts into a distinct ignored directory.
+.\.venv\Scripts\kaggle.exe kernels output `
+  dattadhebe/solar-filament-oof-tta-refinement/1 `
+  -p outputs\kaggle\experiment-003-v1
+
+# Inspect recorded folds, checkpoints, TTA metrics, grid results, and errors.
+Get-Content `
+  outputs\kaggle\experiment-003-v1\experiment-003-run-metadata.json
+Get-Content `
+  outputs\kaggle\experiment-003-v1\solar-filament-oof-tta-refinement.log
+
+# Re-run the repository gate and fully decode/canonicalize all 1,332 RLEs.
+.\scripts\validate.ps1
+
+# After human review and explicit user approval, submit experiment 003.
+.\.venv\Scripts\kaggle.exe competitions submit `
+  -c filament-segmentation-2026 `
+  -f outputs\kaggle\experiment-003-v1\experiment-003-submission.csv `
+  -m "experiment-003 consensus fine-tuning TTA five-fold OOF instance refinement"
+
+# Confirm acceptance and the eventual public score.
+.\.venv\Scripts\kaggle.exe competitions submissions `
+  -c filament-segmentation-2026 --page-size 10
+
+# Review exactly what entered the source commit.
+git status --short
+git diff --check
+git add CHANGELOG.md README.md `
+  configs/experiment-002-overnight-ensemble.yaml `
+  configs/experiment-003-oof-tta-refinement.yaml `
+  docs/experiments.md docs/external-data.md `
+  kaggle/first_submission.py tests/test_kaggle_kernel.py
+git diff --cached --check
+git diff --cached --stat
+git commit -m "feat: add five-fold refinement pipeline"
+git status --short
+```
+
+The commit staged an explicit source/documentation list. It did not stage the
+ignored metadata, checkpoints, logs, predictions, masks, metrics, or submission
+CSV.
+
+### Files changed for experiment 003 and why
+
+| File or generated location | Change | Reason |
+| --- | --- | --- |
+| `configs/experiment-003-oof-tta-refinement.yaml` | Added checkpoint fine-tuning mode, checkpoint root, soft-consensus target strategy, lower learning rate, TTA list, and 72-candidate post-processing grid. | Keeps every material experiment-003 choice declarative, reviewable, and reproducible. |
+| `kaggle/first_submission.py` | Evolved the shared script to resolve only experiment-002 fold checkpoints, construct observation-level consensus targets, fine-tune each fold, invert/average TTA transforms, filter instances by area and mean confidence, compare all OOF candidates, and record expanded metadata. | Implements the refinement hypothesis while maintaining grouped validation, grayscale loading, instance output, and strict RLE checks. |
+| `kaggle/kernel-metadata.json` | Changed the private kernel identity to `solar-filament-oof-tta-refinement` and added `dattadhebe/solar-filament-overnight-ensemble/1` as a kernel source; internet remained disabled. | Makes the experiment-002 checkpoints available read-only inside Kaggle without external downloads. This account-specific file remains ignored. |
+| `tests/test_kaggle_kernel.py` | Pointed the embedded-config parity test at experiment 003 and added assertions for refinement mode, experiment-002-only checkpoint provenance, consensus targets, and all five folds. | Detects configuration drift and accidental use of an unapproved checkpoint source. |
+| `README.md` | Documented experiment 003, the experiment-002 baseline, and the decision not to exploit the public metric. It was later updated with the completed 0.66 score. | Gives reviewers an accurate current overview and separates verified facts from pending runs. |
+| `docs/experiments.md` | Added experiment 003 and later replaced “running” with its completed diagnostics and verified score. | Maintains the compact experiment comparison and promotion record. |
+| `docs/external-data.md` | Added the organizer clarification, test-label leakage warning, and empty-mask metric warning. | Records why external public annotations and score exploits were rejected. |
+| `CHANGELOG.md` | Recorded consensus fine-tuning, TTA, confidence filtering, and the expanded OOF search. | Makes the material capability change visible at repository level. |
+| `outputs/kaggle/experiment-003-v1/` | Generated five fine-tuned weights, raw log, run metadata, and the 1,332-row candidate CSV. | Preserves the evidence required for review while keeping generated artifacts out of Git. |
+
+No files under `src/solar_filament_segmentation/` were changed in commit
+`74a00ba`. The Kaggle job remained deliberately self-contained in
+`kaggle/first_submission.py`; reusable local validation helpers under `src/`
+continued to validate the downloaded candidate.
+
+Private kernel source configuration:
+
+```text
+competition source: filament-segmentation-2026
+kernel source: dattadhebe/solar-filament-overnight-ensemble/1
+internet: disabled
+GPU: NVIDIA T4
+```
+
+Launch and status:
+
+```powershell
+.\.venv\Scripts\kaggle.exe kernels push `
+  -p kaggle --accelerator NvidiaTeslaT4 --timeout 43200
+
+.\.venv\Scripts\kaggle.exe kernels status `
+  dattadhebe/solar-filament-oof-tta-refinement
+```
+
+Immediate and delayed startup checks reported `KernelWorkerStatus.RUNNING`.
+The final check reported `KernelWorkerStatus.COMPLETE`.
+
+Artifact download:
+
+```powershell
+.\.venv\Scripts\kaggle.exe kernels output `
+  dattadhebe/solar-filament-oof-tta-refinement/1 `
+  -p outputs\kaggle\experiment-003-v1
+```
+
+Experiment 003 completed successfully and improved the grouped OOF instance
+diagnostics over experiment 002.
+
+| Metric | Experiment 002 | Experiment 003 |
+| --- | ---: | ---: |
+| Mean semantic Dice | 0.6481 | 0.6527 with TTA |
+| Penalized OOF instance Dice | 0.4304 | 0.4901 |
+| Matched-instance Dice | 0.7047 | 0.7215 |
+| Matched-instance IoU | 0.5635 | 0.5819 |
+| Missed instances | 1,033 | 1,693 |
+| Extra instances | 4,432 | 2,103 |
+| Test predictions | 1,771 | 1,332 |
+
+Additional checks:
+
+```text
+Runtime: 2.883 hours
+Mean best fine-tuning semantic Dice: 0.651170
+Mean TTA semantic Dice: 0.652722
+Matched instances: 6,506
+One-to-many relations: 510
+Many-to-one relations: 117
+Tracebacks: 0
+Errors: 0
+NaNs: 0
+CUDA out-of-memory errors: 0
+```
+
+Fold results:
+
+| Fold | Best fine-tuning epoch | Fine-tuning Dice | TTA Dice |
+| ---: | ---: | ---: | ---: |
+| 0 | 12 | 0.657749 | 0.659203 |
+| 1 | 10 | 0.655008 | 0.657890 |
+| 2 | 12 | 0.646336 | 0.648174 |
+| 3 | 5 | 0.652026 | 0.650399 |
+| 4 | 6 | 0.644728 | 0.647945 |
+
+OOF-selected processing:
+
+```text
+probability threshold: 0.50
+closing kernel: 7
+minimum component area at model resolution: 96
+minimum component mean confidence: 0.80
+```
+
+Submission validation:
+
+```text
+1,332 canonical 2048 x 2048 RLE masks passed
+Known test images: 180
+Images with predictions: 176
+Empty RLE values: 0
+Duplicate filament IDs: 0
+Mask-area pixels, min/median/max: 384 / 1,182 / 17,680
+Instances per image, min/median/max: 0 / 8 / 18
+Zero-prediction images: 4
+```
+
+Submission command:
+
+```powershell
+.\.venv\Scripts\kaggle.exe competitions submit `
+  -c filament-segmentation-2026 `
+  -f outputs\kaggle\experiment-003-v1\experiment-003-submission.csv `
+  -m "experiment-003 consensus fine-tuning TTA five-fold OOF instance refinement"
+```
+
+Kaggle accepted reference `55107032`. Its final public score is 0.66.
+
+Raw local artifacts:
+
+```text
+outputs/kaggle/experiment-003-v1/experiment-003-run-metadata.json
+outputs/kaggle/experiment-003-v1/solar-filament-oof-tta-refinement.log
+outputs/kaggle/experiment-003-v1/experiment-003-submission.csv
+outputs/kaggle/experiment-003-v1/experiment-003-fold-0.pt
+outputs/kaggle/experiment-003-v1/experiment-003-fold-1.pt
+outputs/kaggle/experiment-003-v1/experiment-003-fold-2.pt
+outputs/kaggle/experiment-003-v1/experiment-003-fold-3.pt
+outputs/kaggle/experiment-003-v1/experiment-003-fold-4.pt
+```
+
+## Future experiment roadmap
+
+These are engineering suggestions, not promised leaderboard gains. Public score
+1.00 is not the optimization target because the known empty-mask defect can
+produce that score without valid segmentation. Every promotion must be justified
+by grouped OOF instance diagnostics and qualitative mask review before a
+competition submission is considered.
+
+### Recommended order
+
+| Priority | Proposed ID | Main hypothesis | Compute estimate | Promotion gate |
+| ---: | --- | --- | --- | --- |
+| 1 | 004 | An OOF-trained component-quality ranker and fragment-linking pass can reduce experiment 003's 2,103 extra instances without a large recall loss. | 2-4 T4 hours, mostly checkpoint inference | Penalized OOF Dice above 0.505, at least 15% fewer extras, and no more than 5% more misses than 003 |
+| 2 | 005 | Hybrid consensus/annotator supervision can recover filaments lost by the stronger experiment-003 filtering. | 3-6 T4 hours for a screen; 6-10 hours for five-fold confirmation | Penalized OOF Dice above the promoted 004 result and lower misses without restoring 003-level extras |
+| 3 | 006 | A boundary-aware multi-head U-Net can separate touching filaments better than connected components of one semantic channel. | 8-12 T4 hours | Better penalized Dice plus lower one-to-many and many-to-one rates on the same folds |
+| 4 | 007 | More spatial detail or model capacity can improve thin-filament recall after the instance pipeline is reliable. | 8-12 T4 hours per confirmed setting | At least +0.005 mean OOF semantic Dice and a positive instance-Dice change |
+| 5 | 008 | Self-supervised pretraining on official training JPEGs can improve feature quality without external labels or test leakage. | 8-12 hours pretraining plus supervised confirmation | Consistent gain across at least four of five folds and improved instance metrics |
+
+The gates are intentionally stricter than “public score increased.” They can be
+revised before implementation, but must be fixed before examining test
+predictions or leaderboard feedback.
+
+### Experiment 004: cross-fitted component quality and fragment linking
+
+Why this is first:
+
+- Experiment 003 already has reasonable matched-instance quality
+  (`0.721510` Dice), but still produces 2,103 unmatched extra instances.
+- Improving the decision about which connected components to keep is cheaper
+  and more directly supported by the error data than immediately training a
+  much larger model.
+- It can reuse the five experiment-003 checkpoints and official labels only.
+
+Implementation:
+
+1. Preserve experiment 003 unchanged. Create:
+
+   ```text
+   configs/experiment-004-component-quality.yaml
+   kaggle/experiment_004.py
+   tests/test_experiment_004.py
+   ```
+
+   Use a new script instead of overwriting `first_submission.py`, so the exact
+   source for every future Kaggle run remains versioned.
+
+2. Load each experiment-003 fold checkpoint and recompute probability maps only
+   for that fold's grouped validation observations. Never generate a training
+   feature row from a model that trained on the same `file_name`.
+
+3. From every candidate component, compute features that do not require hidden
+   metadata:
+
+   ```text
+   area
+   perimeter
+   mean/max/standard-deviation probability
+   probability quantiles
+   major/minor axis lengths
+   eccentricity
+   solidity
+   bounding-box aspect ratio
+   skeleton length
+   estimated width = area / skeleton length
+   distance from solar-disk center
+   normalized radial position
+   distance to the eroded disk boundary
+   nearest-component distance
+   nearest-component tangent alignment
+   ```
+
+4. Derive a component quality target from official OOF instances. For a physical
+   observation with multiple annotators, compute each candidate's maximum IoU
+   to an instance in each annotation set, then average those maxima. This
+   produces an annotator-aware continuous quality target without copying one
+   image across training and validation.
+
+5. Train a small deterministic model such as
+   `HistGradientBoostingRegressor` on four OOF feature folds and predict the
+   fifth. Repeat for all five folds. This outer cross-fitting is mandatory:
+   evaluating a ranker on the same components used to fit it would give an
+   optimistic result.
+
+6. Search the component-score cutoff using only the concatenated cross-fitted
+   predictions. Report score calibration, per-fold diagnostics, per-image Dice
+   distributions, missed/extra counts, and split/merge behavior.
+
+7. Add a conservative fragment-linking candidate grid. Connect two components
+   only when their skeleton endpoints are close, endpoint tangents align, the
+   probability along the gap is sufficiently high, and the merged shape remains
+   filament-like. Select link distance, alignment, and gap-probability settings
+   on the same cross-fitted OOF predictions.
+
+8. For test inference, fit the ranker once on all OOF component rows, then apply
+   it to experiment-003 ensemble components. Do not fit normalization,
+   calibration, thresholds, or feature selection to test components.
+
+Suggested configuration additions:
+
+```yaml
+component_quality:
+  model: histogram-gradient-boosting-regressor
+  seed: 20260730
+  max_depth: 3
+  max_iter: 150
+  learning_rate: 0.05
+  quality_cutoffs: [0.10, 0.15, 0.20, 0.25, 0.30]
+  cross_fit_by: validation_fold
+
+fragment_linking:
+  enabled_candidates: [false, true]
+  maximum_endpoint_distance: [0, 8, 16, 24]
+  minimum_tangent_cosine: [0.80, 0.90]
+  minimum_gap_probability: [0.30, 0.40, 0.50]
+```
+
+Keep the actual grid modest after a synthetic timing test. The values above are
+starting hypotheses, not OOF-selected results.
+
+Required tests:
+
+- feature extraction is deterministic;
+- feature values contain no NaNs or infinities;
+- cross-fitting never trains on the predicted row's `file_name`;
+- duplicate annotator records remain in one fold;
+- linking never crosses the solar-disk boundary;
+- each output instance is non-empty and unique;
+- RLE remains canonical at 2048 x 2048;
+- embedded and versioned YAML configurations match.
+
+### Experiment 005: hybrid annotator-consensus supervision
+
+Why:
+
+- Soft consensus helped reduce false positives, but experiment 003 misses rose
+  from 1,033 to 1,693.
+- Averaging annotators can lower the target probability of filaments marked by
+  only one annotator. A hybrid loss can retain consensus while exposing the
+  model to valid annotator-specific structures.
+
+Implementation:
+
+1. Add:
+
+   ```text
+   configs/experiment-005-hybrid-annotator.yaml
+   kaggle/experiment_005.py
+   tests/test_experiment_005.py
+   ```
+
+2. Keep the immutable five grouped folds and load only experiment-003
+   competition-trained checkpoints.
+
+3. For every physical training observation, return both:
+
+   - the soft mean of all official annotator masks;
+   - one deterministic, epoch-seeded annotator mask.
+
+4. Optimize a weighted hybrid objective:
+
+   ```text
+   total =
+       consensus_weight * BCE+Dice(soft_consensus)
+       + annotator_weight * BCE+Dice(sampled_annotator)
+   ```
+
+   Screen fixed weight pairs such as `(0.75, 0.25)` and `(0.50, 0.50)`.
+   Do not choose weights from test behavior.
+
+5. Use a two-stage budget:
+
+   - screen the two fixed weight pairs on two predeclared grouped folds;
+   - choose one pair using only those folds;
+   - run the selected pair on all five folds and report the full OOF result.
+
+6. Feed its OOF probabilities through the already fixed experiment-004
+   component pipeline. If post-processing is retuned, label the result as a
+   separate experiment variant so model and post-processing effects remain
+   distinguishable.
+
+Suggested configuration:
+
+```yaml
+training:
+  target_strategy: hybrid-consensus-random-annotator
+  consensus_loss_weight: 0.75
+  annotator_loss_weight: 0.25
+  learning_rate: 0.0001
+  epochs: 12
+  minimum_epochs: 6
+  early_stopping_patience: 3
+```
+
+Required additional reporting:
+
+- recall and missed instances by number of annotators available;
+- component precision and extra instances;
+- Dice distribution for single-annotator versus multi-annotator observations;
+- the exact screen folds and decision made before full confirmation.
+
+### Experiment 006: boundary-aware instance model
+
+Why:
+
+- Connected components can merge touching filaments and split faint,
+  interrupted filaments.
+- Official COCO annotations provide instance masks, so foreground and boundaries
+  can be learned without external data.
+
+Implementation:
+
+1. Extend the U-Net decoder to three one-channel heads:
+
+   ```text
+   foreground probability
+   instance-boundary probability
+   centerline or signed-distance target
+   ```
+
+2. Build targets from official instance masks at model resolution:
+
+   - union mask for foreground;
+   - per-instance morphological boundary, clipped so adjacent objects remain
+     separable;
+   - normalized distance transform or skeleton heatmap inside each instance.
+
+3. Use a weighted multi-task loss with values fixed in YAML. Start with:
+
+   ```yaml
+   loss:
+     foreground: 1.0
+     boundary: 0.5
+     distance_or_centerline: 0.25
+   ```
+
+4. At inference, threshold foreground, suppress high boundary probability,
+   generate seeds from centerline/distance peaks, run marker-controlled
+   watershed, and regrow instances inside the foreground mask.
+
+5. Tune only a compact threshold/seed grid on grouped OOF predictions. Compare
+   directly with connected components using identical fold probabilities.
+
+6. Report one-to-many and many-to-one counts as primary diagnostics for this
+   experiment. A semantic Dice increase alone is insufficient to promote it.
+
+Start by initializing the shared encoder/decoder from experiment 003 and adding
+new randomly initialized heads. If optimization is unstable, run a clean
+from-scratch control on one predeclared fold before spending on all five.
+
+### Experiment 007: resolution and capacity ablation
+
+Do this only after experiment 004 or 006 improves instance handling; otherwise a
+larger semantic model may simply generate more fragments.
+
+Implementation:
+
+1. Compare one variable at a time on the same two predeclared screen folds:
+
+   ```text
+   A: 1024 input, 32 base channels
+   B: 1280 input, 24 base channels
+   C: 1536 input, 16 or 24 base channels
+   ```
+
+2. Use batch size 1 and gradient accumulation 2 for larger inputs. Keep effective
+   batch size, seed, augmentations, targets, folds, and post-processing fixed.
+
+3. Run a short synthetic/T4 memory probe before the real job. Abort a setting
+   after a repeatable out-of-memory condition rather than silently reducing
+   resolution or changing architecture.
+
+4. Promote one setting to all five folds only if it gains at least 0.005
+   semantic Dice on both screen folds and does not worsen the instance
+   diagnostic.
+
+5. Record throughput, peak GPU memory when available, runtime per epoch, and
+   total cost in metadata.
+
+Multi-scale TTA can be tested afterward as a separate inference-only variant.
+Do not combine capacity, resolution, new augmentation, and new post-processing
+in one run because the source of any gain would be unknowable.
+
+### Experiment 008: official-training-only self-supervised pretraining
+
+This is lower priority and must use only the 707 official training JPEGs.
+Competition test images must remain inference-only and cannot be included in
+self-supervised training.
+
+Implementation:
+
+1. Train the existing encoder as a masked autoencoder or denoising autoencoder
+   using fixed grayscale crops from official training images.
+2. Save a checkpoint whose metadata contains the exact list/hash of training
+   filenames and asserts that no test filename was present.
+3. Initialize the supervised segmentation encoder from that checkpoint; all
+   decoder and output heads remain task-trained on official labels.
+4. Compare against the identical randomly initialized architecture on the same
+   grouped folds.
+5. Promote only if gains are consistent across at least four folds and instance
+   diagnostics improve, not merely training loss.
+
+This approach uses no supervised external weights, but organizer rules should be
+rechecked immediately before implementation in case they change.
+
+### Implementation workflow for each future experiment
+
+Use this sequence and preserve a separate source snapshot:
+
+```powershell
+# 1. Create a unique YAML and script, then add synthetic tests.
+# Example names only; do not overwrite an earlier experiment script.
+Get-Content configs\experiment-004-component-quality.yaml
+Get-Content kaggle\experiment_004.py
+
+# 2. Run the full local gate.
+.\scripts\validate.ps1
+git diff --check
+git status --short
+
+# 3. Review the exact source diff and ensure ignored artifacts are absent.
+git diff -- configs kaggle src tests docs README.md CHANGELOG.md
+
+# 4. Obtain explicit user approval, then push one private GPU kernel.
+.\.venv\Scripts\kaggle.exe kernels push `
+  -p kaggle --accelerator NvidiaTeslaT4 --timeout 43200
+
+# 5. Monitor, download to a unique ignored directory, and validate.
+.\.venv\Scripts\kaggle.exe kernels status <owner/new-kernel>
+.\.venv\Scripts\kaggle.exe kernels output <owner/new-kernel/version> `
+  -p outputs\kaggle\<new-experiment-version>
+.\scripts\validate.ps1
+
+# 6. Compare against the fixed experiment-003/004 OOF baselines.
+# Do not inspect or tune against test-image statistics.
+
+# 7. Only after artifact validation and human review, request separate
+# explicit approval for a competition submission.
+```
+
+For all future experiments:
+
+- freeze the hypothesis and promotion gate in YAML before training;
+- preserve the same physical-observation folds and fingerprint;
+- save OOF diagnostics by fold and physical observation;
+- record per-image distributions, not only means;
+- report both improvements and regressions;
+- never use test images for pseudo-label training, normalization fitting,
+  calibration, threshold selection, feature selection, or stopping decisions;
+- never use external MAGFiLO annotations;
+- never optimize toward the empty-mask public-score exploit;
+- never overwrite an earlier experiment's versioned source script;
+- keep Kaggle credentials, kernel metadata, weights, logs, predictions, masks,
+  metrics, and submission CSVs out of Git.
+
+## How the pipeline was implemented
+
+### Configuration and invariant enforcement
+
+Every experiment has a versioned YAML file under `configs/`. The loader in
+`src/solar_filament_segmentation/config.py` rejects configurations that violate
+competition invariants:
+
+- competition slug must be `filament-segmentation-2026`;
+- masks must be 2048 x 2048;
+- observations must be grayscale;
+- validation group key must be `file_name`;
+- task must remain instance segmentation;
+- external labeled data must be disabled;
+- submission columns and RLE format must be exact.
+
+The Kaggle API uploads one code file, so the active YAML is embedded in
+`kaggle/first_submission.py`. `tests/test_kaggle_kernel.py` parses the Python
+source with `ast`, loads the embedded YAML, and requires exact equality with the
+versioned config. This prevents a pushed kernel from silently diverging from
+the reviewed experiment.
+
+### COCO loading and physical-observation grouping
+
+`load_examples()` reads only the official training JSON. It associates every
+annotation polygon with its COCO image record and derives the physical
+observation key from `Path(file_name).stem`.
+
+The grouped split algorithm:
+
+1. sorts the 707 unique physical observation keys;
+2. shuffles them with the fixed validation seed `20260729`;
+3. assigns them round-robin across five folds;
+4. maps every annotation-set record for the same JPEG to the same fold;
+5. serializes sorted `observation,fold` pairs;
+6. hashes that canonical text with SHA-256.
+
+This produced the immutable fingerprint:
+
+```text
+69a31d113fd4e4cea63f1a072d94dd0dea2c1432c18d349d8a2575c5d1915aa7
+```
+
+The test split is not read by split construction, fitting, threshold selection,
+or model selection.
+
+### Polygon rasterization
+
+All official polygons are converted with `pycocotools`:
+
+1. coordinates are scaled from 2048 to the configured model resolution;
+2. `mask_utils.frPyObjects()` creates COCO RLE objects;
+3. `mask_utils.decode()` rasterizes every instance;
+4. the per-instance stack is combined into a semantic foreground mask;
+5. a separate integer label map preserves the instance IDs for OOF matching.
+
+The model always receives one grayscale channel. Images use bilinear resizing;
+discrete masks use polygon rasterization at the target model resolution.
+
+### U-Net architecture
+
+The self-contained `SmallUNet` has:
+
+- one input channel;
+- base width 16 in experiment 001 and 24 in experiments 002/003;
+- three encoder levels;
+- a bottleneck at eight times the base width;
+- max-pooling downsampling;
+- transposed-convolution upsampling;
+- skip concatenations;
+- two convolution, batch-normalization, and ReLU stages per block;
+- one-logit semantic foreground output.
+
+Weights were initialized from scratch for experiments 001/002. Experiment 003
+resumed only the five experiment-002 checkpoints trained from official
+competition labels.
+
+### Training targets
+
+Experiments 001/002 treated every annotation-set record as a separate sample.
+This meant the same JPEG could appear two or three times with independently
+drawn masks.
+
+Experiment 003 reduced that label noise with
+`consensus_training_samples()`:
+
+1. group annotation sets by physical observation;
+2. verify that repeated records refer to identical cached pixels;
+3. sum their semantic foreground masks;
+4. divide by the number of annotators;
+5. train once on the resulting soft target.
+
+The held-out fold still keeps every annotator mask separate. Consensus is used
+only for the training portion, so validation does not leak into fitting and
+annotator disagreement remains visible in OOF diagnostics.
+
+### Augmentation, optimizer, and loss
+
+Training augmentation is deterministic under each fold seed and includes:
+
+- horizontal flip;
+- vertical flip;
+- 90-degree rotations;
+- bounded brightness shift;
+- bounded contrast scaling.
+
+The loss is:
+
+```text
+total loss = BCE weight * weighted binary cross entropy
+           + Dice weight * soft Dice loss
+```
+
+The positive-class BCE weight is 4.0. Optimizer and scheduling:
+
+```text
+optimizer: AdamW
+weight decay: 0.0001
+experiment-002 starting learning rate: 0.001
+experiment-003 fine-tuning learning rate: 0.0002
+scheduler: cosine annealing
+mixed precision: enabled on CUDA
+```
+
+The best checkpoint is selected only by semantic Dice on that fold's grouped
+validation records. Early stopping cannot occur before the configured minimum
+epoch count.
+
+### Test-time augmentation and ensembling
+
+Experiment 003 applies four transforms:
+
+```text
+identity
+horizontal flip
+vertical flip
+horizontal + vertical flip
+```
+
+Each transformed prediction is flipped back to the original orientation before
+averaging. The same TTA is used for OOF predictions and test inference. The five
+fold-model probability maps are then averaged. Test masks or test-derived
+statistics do not influence this averaging.
+
+### Solar-disk restriction and instance separation
+
+For each model-resolution image:
+
+1. Otsu thresholding identifies bright solar content;
+2. connected-component statistics select the largest disk region;
+3. an elliptical erosion removes the bright limb;
+4. the ensemble probability is thresholded;
+5. morphological closing repairs small gaps;
+6. 8-connected components create candidate instances;
+7. candidates are filtered by area;
+8. experiment 003 additionally filters by mean component probability;
+9. remaining instances are sorted deterministically by area and centroid.
+
+The pipeline is semantic during training but remains instance-aware at output
+through this documented separation stage.
+
+### OOF instance diagnostic and post-processing selection
+
+For every held-out annotation set:
+
+1. predicted components are compared with the integer ground-truth label map;
+2. pairwise intersections, unions, Dice, and IoU are computed;
+3. pairs below the configured minimum IoU are discarded;
+4. remaining pairs are greedily matched by descending quality;
+5. matched Dice and IoU are accumulated;
+6. missed and extra instances are counted;
+7. one-to-many and many-to-one overlap behavior is counted.
+
+The penalized diagnostic is:
+
+```text
+sum of matched Dice / max(number of predicted instances,
+                          number of target instances,
+                          1)
+```
+
+This intentionally penalizes both missed and extra instances. It is a local
+diagnostic, not a claim of organizer parity.
+
+Experiment 002 evaluated 27 validation-only candidates across probability
+threshold, closing kernel, and minimum area. Experiment 003 evaluated 72
+candidates and added minimum mean component probability. The selected
+parameters are applied to test predictions only after OOF selection is
+finished.
+
+### Submission encoding
+
+Each selected model-resolution instance is resized to 2048 x 2048 with nearest
+neighbor interpolation. `pycocotools.mask.encode()` receives a
+Fortran-contiguous binary mask. Only its ASCII compressed `counts` string is
+written.
+
+Rows use:
+
+```text
+<test-image-stem>_<positive-instance-number>,<compressed-counts>
+```
+
+The CSV writer produces exactly:
+
+```text
+filament_id,segmentation_rle
+```
+
+### Kaggle packaging
+
+`kaggle/kernel-metadata.json` is generated locally and ignored by Git. It sets:
+
+- private kernel;
+- Python script;
+- NVIDIA T4;
+- internet disabled;
+- official competition source;
+- experiment-002 kernel output as the sole checkpoint source for experiment
+  003.
+
+No Kaggle kernel performs a competition submission. Kernels only write
+checkpoints, run metadata, logs, and a candidate CSV to `/kaggle/working`.
+
+## Chronological action ledger
+
+### 2026-07-29: repository and competition audit
+
+```text
+Inspected repository layout and documentation.
+Added a challenge overview to README.md.
+Verified Kaggle access and competition entry through the configured CLI.
+Downloaded the official archive into ignored local storage.
+Audited COCO schema, images, polygons, categories, duplicates, and split overlap.
+Confirmed 707 physical training images and 180 test images.
+Confirmed grayscale 2048 x 2048 JPEGs.
+Confirmed no exact filename or SHA-256 train/test overlap.
+Ran Ruff and 23 synthetic tests.
+```
+
+### 2026-07-29/30: experiment 001
+
+```text
+Added experiment-001 YAML.
+Added a self-contained 512 x 512 U-Net Kaggle script.
+Created private kernel metadata.
+Received post-validation approval.
+Pushed kernel version 1.
+Verified RUNNING twice.
+Downloaded COMPLETE artifacts.
+Validated all 1,970 RLE masks.
+Received submission approval.
+Uploaded candidate.
+Observed a CLI response-parse error after 100% upload.
+Checked submission list instead of retrying.
+Confirmed reference 55089873.
+Verified final public score 0.52.
+```
+
+### 2026-07-30: experiment 002
+
+```text
+Expanded the kernel to 1024 x 1024.
+Added five grouped fold models.
+Added early stopping and cosine scheduling.
+Added instance label maps and local instance matching.
+Added 27 OOF post-processing candidates.
+Added five-model test ensemble.
+Ran Ruff and 26 tests.
+Received post-validation approval.
+Pushed private T4 kernel version 1.
+Verified RUNNING three times.
+Downloaded COMPLETE artifacts.
+Validated all 1,771 RLE masks.
+Reviewed fold and OOF diagnostics.
+Received submission approval.
+Confirmed reference 55099193.
+Verified final public score 0.62.
+```
+
+### 2026-07-30: rule and metric investigation
+
+```text
+Verified multiple live leaderboard entries at 1.00.
+Queried the official competition file inventory.
+Confirmed there is no second official labeled dataset.
+Fetched authenticated Evaluation and Rules content.
+Listed and read discussions about empty-mask scoring and public MAGFiLO overlap.
+Confirmed public MAGFiLO includes all 180 hidden test labels.
+Confirmed organizer prohibition on using external MAGFiLO ground truth.
+Confirmed the public metric can reward empty predictions.
+Decided not to download leaked labels or exploit the metric.
+```
+
+### 2026-07-30: experiment 003
+
+```text
+Added experiment-003 YAML.
+Attached only our experiment-002 competition-trained checkpoints.
+Added continued low-learning-rate training.
+Added soft annotator-consensus training targets.
+Added four-way TTA.
+Added component confidence filtering.
+Expanded OOF search to 72 candidates.
+Ran Ruff and 27 tests.
+Received post-validation approval.
+Pushed private T4 kernel version 1.
+Verified RUNNING immediately and after checkpoint mounting.
+Downloaded COMPLETE artifacts.
+Reviewed all fold histories and OOF candidate summaries.
+Validated all 1,332 RLE masks.
+Received submission approval.
+Confirmed reference 55107032.
+Verified final public score 0.66.
+```
+
+## Notable failures, gates, and corrections
+
+### README encoding context
+
+An initial patch matched PowerShell's incorrectly decoded display of the
+multiplication sign and failed to apply. The file was reread explicitly as
+UTF-8, and the patch was applied against the actual `×` character. No file
+encoding was changed.
+
+### Ruff invoked on YAML
+
+One early command passed a YAML path to Ruff, which produced Python syntax
+errors. The YAML itself was valid. Subsequent Ruff commands target Python files,
+while YAML is loaded and checked through the project configuration tests.
+
+### Required Kaggle push approvals
+
+Initial private-kernel pushes were blocked when approval had not been renewed
+after local validation. No workaround was attempted. For each experiment the
+resulting sequence was:
+
+```text
+finish local implementation
+run Ruff, tests, and data audit
+report the reviewed configuration
+receive explicit post-validation approval
+push private Kaggle kernel
+verify RUNNING
+```
+
+### Experiment-001 submit response
+
+The CLI uploaded 100% of the CSV and then failed to parse an empty/non-JSON
+response. The upload was not repeated. `competitions submissions` confirmed the
+accepted reference, preventing a duplicate submission.
+
+### Competition file-output option
+
+`competitions files --json` was rejected because that subcommand uses:
+
+```text
+--format json
+```
+
+The corrected command is recorded in the rule-investigation section.
+
+### Competition page-command syntax
+
+The installed Kaggle CLI exposed the competition argument at both the parent
+and list-subcommand levels. Initial single-position attempts returned “No
+competition specified” or an invalid command choice. The working authenticated
+syntax uses the slug in both accepted positional locations, as recorded above.
+
+### Public web-page response
+
+Unauthenticated page reads returned the Kaggle shell without rule content. The
+authenticated Kaggle CLI `competitions pages` command was used instead. No
+authentication data was inspected or copied.
+
+### Metric exploit
+
+The live leaderboard and discussions showed 1.00 scores from empty-mask
+behavior. The project did not imitate this. Model decisions remain tied to
+grouped OOF instance quality because the organizer says poor segmentation
+strategies are not prize-worthy.
+
+## Files changed by the work
+
+Versioned source and documentation:
+
+```text
+README.md
+CHANGELOG.md
+configs/experiment-001-first-submission.yaml
+configs/experiment-002-overnight-ensemble.yaml
+configs/experiment-003-oof-tta-refinement.yaml
+docs/competition.md
+docs/experiments.md
+docs/external-data.md
+docs/project-history.md
+docs/validation.md
+kaggle/first_submission.py
+src/solar_filament_segmentation/config.py
+src/solar_filament_segmentation/data.py
+src/solar_filament_segmentation/metrics.py
+src/solar_filament_segmentation/rle.py
+src/solar_filament_segmentation/submission.py
+tests/test_config.py
+tests/test_data.py
+tests/test_kaggle_kernel.py
+tests/test_metrics.py
+tests/test_repository_safety.py
+tests/test_rle.py
+tests/test_submission.py
+```
+
+Generated and ignored:
+
+```text
+data/raw/
+outputs/setup/
+outputs/kaggle/experiment-001-v1/
+outputs/kaggle/experiment-002-v1/
+outputs/kaggle/experiment-003-v1/
+kaggle/kernel-metadata.json
+*.pt
+submission*.csv
+```
+
+## Full submission-validation command pattern
+
+Every candidate CSV was parsed with `csv.DictReader`, converted to
+`SubmissionRow` objects, and checked with:
+
+```python
+validate_submission_rows(
+    rows,
+    known_image_ids=known_test_image_ids,
+    height=2048,
+    width=2048,
+    decode_masks=True,
+)
+```
+
+The checks enforce:
+
+- exact two-column header;
+- known test-image stems;
+- unique and correctly suffixed filament IDs;
+- non-empty ASCII compressed RLE strings;
+- successful 2048 x 2048 decode;
+- non-empty decoded masks;
+- canonical encode/decode round trips;
+- no duplicate masks within one image.
+
+## Git history
+
+```text
+44cc0c7  Initialize Solar Filament Segmentation Challenge workspace
+4b3d5cc  feat: add first Kaggle submission baseline
+74a00ba  feat: add five-fold refinement pipeline
+```
+
+Commit commands used:
+
+```powershell
+git add <explicit reviewed file list>
+git diff --cached --check
+git diff --cached --stat
+git commit -m "feat: add first Kaggle submission baseline"
+git commit -m "feat: add five-fold refinement pipeline"
+git status --short
+```
+
+Generated data, weights, metrics, logs, predictions, kernel metadata, and
+submission files were reviewed before each commit and were not staged.
+
+## Standard continuation workflow
+
+For every future experiment:
+
+```powershell
+# 1. Validate source and synthetic behavior.
+.\scripts\validate.ps1
+git diff --check
+
+# 2. After explicit post-validation approval, push the private kernel.
+.\.venv\Scripts\kaggle.exe kernels push `
+  -p kaggle --accelerator NvidiaTeslaT4 --timeout 43200
+
+# 3. Verify startup and eventual completion.
+.\.venv\Scripts\kaggle.exe kernels status <owner/kernel-slug>
+
+# 4. Download into a new ignored directory.
+.\.venv\Scripts\kaggle.exe kernels output <owner/kernel-slug/version> `
+  -p outputs\kaggle\<experiment-version>
+
+# 5. Inspect metadata/logs and fully validate every RLE.
+.\scripts\validate.ps1
+
+# 6. After human review and explicit approval, check allowance and submit.
+.\.venv\Scripts\kaggle.exe competitions submission-limits `
+  filament-segmentation-2026 --json
+
+.\.venv\Scripts\kaggle.exe competitions submit `
+  -c filament-segmentation-2026 `
+  -f <validated-candidate.csv> `
+  -m "<unique experiment description>"
+
+# 7. Confirm acceptance instead of retrying blindly.
+.\.venv\Scripts\kaggle.exe competitions submissions `
+  -c filament-segmentation-2026 --page-size 10
+```
+
+Do not tune against test observations or the broken public metric. Promote a
+candidate only when grouped OOF instance quality, morphology, stability, and
+reproducibility support it.

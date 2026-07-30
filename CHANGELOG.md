@@ -29,3 +29,8 @@
   expanded OOF post-processing search.
 - Documented the organizer's prohibition on external MAGFiLO ground truth and
   the known empty-mask public-metric failure.
+- Added a durable safe command and experiment history with Kaggle run,
+  submission, validation, rule-investigation, artifact, and Git references.
+- Expanded the history with experiment-002/003 decision journals,
+  file-by-file rationale, reproducible command records, and an implementation
+  roadmap for experiments 004 through 008.

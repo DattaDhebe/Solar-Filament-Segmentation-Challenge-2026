@@ -40,9 +40,10 @@ between training and test observations.
 - Experiment 002 trained five grouped 1024 × 1024 models from scratch and
   reached 0.6481 mean fold semantic Dice, 0.4304 penalized OOF instance Dice,
   and a verified public score of 0.62.
-- Experiment 003 is a private Kaggle run that fine-tunes all five models using
-  soft annotator-consensus targets, then applies TTA and validation-selected
-  instance refinement. No result is claimed while it is running.
+- Experiment 003 fine-tuned all five models using soft annotator-consensus
+  targets, then applied TTA and validation-selected instance refinement. It
+  reached 0.4901 penalized OOF instance Dice and a verified public score of
+  0.66.
 - Experiment 001 has a verified public score of 0.52. No leaderboard rank is
   claimed.
 
@@ -65,6 +66,8 @@ between training and test observations.
 
 See [docs/competition.md](docs/competition.md) for the verified rules, timeline,
 data schema, and source links.
+See [docs/project-history.md](docs/project-history.md) for the safe command log,
+experiment results, Kaggle run/submission references, and raw-log locations.
 
 ## Local setup
 
