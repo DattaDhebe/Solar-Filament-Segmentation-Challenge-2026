@@ -1,8 +1,8 @@
-"""Kaggle GPU script for experiment-001, the first submission baseline.
+"""Kaggle GPU script for experiment-003, OOF TTA instance refinement.
 
 This file is deliberately self-contained because the Kaggle kernels API uploads
 only the configured code file. Keep EMBEDDED_CONFIG_YAML synchronized with
-configs/experiment-001-first-submission.yaml; a synthetic test enforces that.
+configs/experiment-003-oof-tta-refinement.yaml; a synthetic test enforces that.
 """
 
 from __future__ import annotations
@@ -23,10 +23,11 @@ from pycocotools import mask as mask_utils
 
 EMBEDDED_CONFIG_YAML = """
 experiment:
-  id: experiment-001
-  name: first-submission-unet
-  seed: 20260729
+  id: experiment-003
+  name: oof-tta-instance-refinement
+  seed: 20260730
   output_root: outputs/experiments
+  mode: checkpoint-finetuning-and-refinement
 
 competition:
   slug: filament-segmentation-2026
@@ -40,12 +41,18 @@ data:
   train_images: train/train_images
   train_annotations: train/MAGFiLO_1.0_Annotations_kaggle2026_train.json
   test_images: test/test_images
+  checkpoint_root: /kaggle/input/solar-filament-overnight-ensemble
 
 validation:
   strategy: grouped-k-fold
   group_key: file_name
   n_splits: 5
-  fold_index: 0
+  fold_indices:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
   shuffle: true
   seed: 20260729
 
@@ -53,15 +60,19 @@ model:
   task: instance-segmentation
   architecture: small-unet
   semantic_training_with_instance_separation: true
-  input_size: 512
-  base_channels: 16
+  input_size: 1024
+  base_channels: 24
   pretrained_weights: false
   external_labeled_data: false
+  competition_trained_checkpoint_source: experiment-002
 
 training:
-  epochs: 8
-  batch_size: 8
-  learning_rate: 0.001
+  target_strategy: annotator-soft-consensus
+  epochs: 18
+  minimum_epochs: 8
+  early_stopping_patience: 4
+  batch_size: 2
+  learning_rate: 0.0002
   weight_decay: 0.0001
   bce_positive_weight: 4.0
   dice_loss_weight: 1.0
@@ -72,22 +83,53 @@ training:
     horizontal_flip_probability: 0.5
     vertical_flip_probability: 0.5
     rotate_90_probability: 0.5
+    brightness_delta: 0.05
+    contrast_range:
+      - 0.9
+      - 1.1
+
+inference:
+  batch_size: 2
+  test_time_augmentations:
+    - identity
+    - horizontal-flip
+    - vertical-flip
+    - horizontal-vertical-flip
 
 postprocessing:
-  probability_threshold: 0.5
-  closing_kernel: 3
+  probability_threshold: 0.6
+  closing_kernel: 5
   closing_iterations: 1
-  disk_erosion_pixels: 4
-  min_component_area_at_model_resolution: 4
-  max_component_area_at_model_resolution: 10000
+  disk_erosion_pixels: 8
+  min_component_area_at_model_resolution: 32
+  max_component_area_at_model_resolution: 40000
+  minimum_component_mean_probability: 0.0
   connectivity: 8
+  matching_min_iou: 0.1
+  selection_grid:
+    probability_thresholds:
+      - 0.5
+      - 0.6
+      - 0.7
+    closing_kernels:
+      - 5
+      - 7
+    minimum_component_areas:
+      - 32
+      - 64
+      - 96
+      - 128
+    minimum_component_mean_probabilities:
+      - 0.0
+      - 0.7
+      - 0.8
 
 metric:
   primary: mean-matched-instance-dice
-  baseline_validation_diagnostic: semantic-dice-at-model-resolution
   diagnostics:
-    - dice-distribution
-    - iou-distribution
+    - semantic-dice-distribution
+    - matched-instance-dice
+    - matched-instance-iou
     - missed-and-extra-instances
     - one-to-many-relations
     - many-to-one-relations
@@ -99,7 +141,7 @@ submission:
   rle_format: coco-compressed-counts
   mask_height: 2048
   mask_width: 2048
-  output_path: /kaggle/working/submission.csv
+  output_path: /kaggle/working/experiment-003-submission.csv
 """.strip()
 
 
@@ -137,6 +179,22 @@ def resolve_data_root(config: dict) -> Path:
     return valid[0]
 
 
+def resolve_checkpoint(config: dict, fold_index: int) -> Path:
+    """Resolve only experiment-002 checkpoints produced from competition data."""
+    file_name = f"experiment-002-fold-{fold_index}.pt"
+    configured = Path(config["data"]["checkpoint_root"]) / file_name
+    if configured.is_file():
+        return configured
+
+    candidates = sorted(Path("/kaggle/input").glob(f"**/{file_name}"))
+    if len(candidates) != 1:
+        raise FileNotFoundError(
+            f"Could not uniquely resolve {file_name}; "
+            f"configured={configured}, candidates={candidates}."
+        )
+    return candidates[0]
+
+
 def load_examples(annotation_path: Path) -> tuple[list[dict], int]:
     """Load train-only COCO records and associate polygons with image records."""
     with annotation_path.open(encoding="utf-8") as stream:
@@ -146,7 +204,7 @@ def load_examples(annotation_path: Path) -> tuple[list[dict], int]:
     for annotation in document["annotations"]:
         segmentation = annotation.get("segmentation")
         if not isinstance(segmentation, list):
-            raise ValueError("Experiment-001 supports the supplied polygon annotations only.")
+            raise ValueError("This pipeline supports the supplied polygon annotations only.")
         annotations_by_image[annotation["image_id"]].extend(segmentation)
 
     examples = []
@@ -182,12 +240,28 @@ def assign_grouped_folds(
     return assignments, fingerprint
 
 
-def rasterize_polygons(polygons: list[list[float]], *, height: int, width: int) -> np.ndarray:
-    """Rasterize official COCO polygons with pycocotools."""
+def rasterize_instances(
+    polygons: list[list[float]],
+    *,
+    original_size: int,
+    model_size: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Rasterize official COCO polygons as semantic and instance-label masks."""
     if not polygons:
-        return np.zeros((height, width), dtype=np.uint8)
-    rles = mask_utils.frPyObjects(polygons, height, width)
-    return (mask_utils.decode(mask_utils.merge(rles)) != 0).astype(np.uint8)
+        shape = (model_size, model_size)
+        return np.zeros(shape, dtype=np.uint8), np.zeros(shape, dtype=np.uint16)
+
+    scale = model_size / original_size
+    scaled_polygons = [[coordinate * scale for coordinate in polygon] for polygon in polygons]
+    rles = mask_utils.frPyObjects(scaled_polygons, model_size, model_size)
+    decoded = mask_utils.decode(rles)
+    if decoded.ndim == 2:
+        decoded = decoded[:, :, np.newaxis]
+    semantic = np.any(decoded != 0, axis=2).astype(np.uint8)
+    instance_labels = np.zeros((model_size, model_size), dtype=np.uint16)
+    for index in range(decoded.shape[2]):
+        instance_labels[decoded[:, :, index] != 0] = index + 1
+    return semantic, instance_labels
 
 
 def prepare_examples(
@@ -196,10 +270,10 @@ def prepare_examples(
     image_directory: Path,
     original_size: int,
     model_size: int,
-) -> list[tuple[np.ndarray, np.ndarray]]:
+) -> list[tuple[np.ndarray, np.ndarray, np.ndarray]]:
     """Cache grayscale images and annotation-set masks at model resolution."""
     image_cache: dict[str, np.ndarray] = {}
-    prepared: list[tuple[np.ndarray, np.ndarray]] = []
+    prepared: list[tuple[np.ndarray, np.ndarray, np.ndarray]] = []
     resampling = Image.Resampling
 
     for index, example in enumerate(examples, start=1):
@@ -212,18 +286,45 @@ def prepare_examples(
                 resized = image.resize((model_size, model_size), resampling.BILINEAR)
                 image_cache[file_name] = np.asarray(resized, dtype=np.uint8)
 
-        full_mask = rasterize_polygons(
+        semantic_mask, instance_labels = rasterize_instances(
             example["polygons"],
-            height=original_size,
-            width=original_size,
+            original_size=original_size,
+            model_size=model_size,
         )
-        mask_image = Image.fromarray(full_mask * 255, mode="L")
-        resized_mask = mask_image.resize((model_size, model_size), resampling.NEAREST)
-        prepared.append((image_cache[file_name], np.asarray(resized_mask) != 0))
+        prepared.append((image_cache[file_name], semantic_mask != 0, instance_labels))
 
         if index % 100 == 0 or index == len(examples):
             print(f"Prepared {index}/{len(examples)} annotation sets.")
     return prepared
+
+
+def consensus_training_samples(
+    prepared: list[tuple[np.ndarray, np.ndarray, np.ndarray]],
+    examples: list[dict],
+    assignments: dict[str, int],
+    *,
+    validation_fold: int,
+) -> list[tuple[np.ndarray, np.ndarray, np.ndarray]]:
+    """Average annotator foreground targets once per physical training observation."""
+    indices_by_observation: dict[str, list[int]] = defaultdict(list)
+    for index, example in enumerate(examples):
+        observation_key = str(example["observation_key"])
+        if assignments[observation_key] != validation_fold:
+            indices_by_observation[observation_key].append(index)
+
+    consensus_samples = []
+    unused_instance_labels = np.empty((0, 0), dtype=np.uint16)
+    for observation_key in sorted(indices_by_observation):
+        indices = indices_by_observation[observation_key]
+        image = prepared[indices[0]][0]
+        target = np.zeros_like(prepared[indices[0]][1], dtype=np.float32)
+        for index in indices:
+            if not np.array_equal(image, prepared[index][0]):
+                raise RuntimeError(f"Annotator records disagree on pixels for {observation_key}.")
+            target += prepared[index][1]
+        target /= len(indices)
+        consensus_samples.append((image, target, unused_instance_labels))
+    return consensus_samples
 
 
 def build_model(base_channels: int):
@@ -290,7 +391,7 @@ def make_dataset_class():
             return len(self.samples)
 
         def __getitem__(self, index: int):
-            image, mask = self.samples[index]
+            image, mask, _ = self.samples[index]
             image = image.copy()
             mask = mask.copy()
             if self.augment:
@@ -304,6 +405,17 @@ def make_dataset_class():
                     turns = random.randint(1, 3)
                     image = np.rot90(image, turns)
                     mask = np.rot90(mask, turns)
+                contrast_min, contrast_max = self.augmentation_config["contrast_range"]
+                contrast = random.uniform(contrast_min, contrast_max)
+                brightness = random.uniform(
+                    -self.augmentation_config["brightness_delta"],
+                    self.augmentation_config["brightness_delta"],
+                )
+                image = np.clip(
+                    image.astype(np.float32) * contrast + brightness * 255.0,
+                    0,
+                    255,
+                ).astype(np.uint8)
 
             image_tensor = (
                 torch.from_numpy(np.ascontiguousarray(image)).float().unsqueeze(0) / 255.0
@@ -354,11 +466,17 @@ def train_model(model, train_loader, validation_loader, *, config: dict, device)
         lr=config["training"]["learning_rate"],
         weight_decay=config["training"]["weight_decay"],
     )
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer,
+        T_max=config["training"]["epochs"],
+    )
     amp_enabled = bool(config["training"]["mixed_precision"] and device.type == "cuda")
     scaler = torch.cuda.amp.GradScaler(enabled=amp_enabled)
     threshold = config["postprocessing"]["probability_threshold"]
     best_score = -1.0
     best_state = None
+    best_epoch = 0
+    epochs_without_improvement = 0
     history = []
 
     for epoch in range(1, config["training"]["epochs"] + 1):
@@ -397,6 +515,7 @@ def train_model(model, train_loader, validation_loader, *, config: dict, device)
                 "epoch": epoch,
                 "training_loss": mean_loss,
                 "validation_semantic_dice": mean_score,
+                "learning_rate": float(optimizer.param_groups[0]["lr"]),
             }
         )
         print(
@@ -405,14 +524,25 @@ def train_model(model, train_loader, validation_loader, *, config: dict, device)
         )
         if mean_score > best_score:
             best_score = mean_score
+            best_epoch = epoch
+            epochs_without_improvement = 0
             best_state = {
                 name: value.detach().cpu().clone() for name, value in model.state_dict().items()
             }
+        else:
+            epochs_without_improvement += 1
+        scheduler.step()
+        if (
+            epoch >= config["training"]["minimum_epochs"]
+            and epochs_without_improvement >= config["training"]["early_stopping_patience"]
+        ):
+            print(f"Early stopping at epoch {epoch}; best epoch was {best_epoch}.")
+            break
 
     if best_state is None:
         raise RuntimeError("Training did not produce a checkpoint.")
     model.load_state_dict(best_state)
-    return model, best_score, history
+    return model, best_score, best_epoch, history
 
 
 def solar_disk_mask(image: np.ndarray, *, erosion_pixels: int) -> np.ndarray:
@@ -471,6 +601,10 @@ def separate_instances(
             <= config["max_component_area_at_model_resolution"]
         ):
             continue
+        component = labels == label
+        mean_probability = float(probability[component].mean())
+        if mean_probability < config["minimum_component_mean_probability"]:
+            continue
         centroid_x, centroid_y = centroids[label]
         candidates.append((-area, float(centroid_y), float(centroid_x), label))
 
@@ -489,64 +623,294 @@ def encode_binary_mask(mask: np.ndarray) -> str:
     return counts
 
 
-def infer_submission(model, *, test_directory: Path, config: dict, device):
-    """Run final inference once over the supplied test observations."""
+def predict_with_tta(model, inputs, *, augmentations: list[str]):
+    """Average aligned probabilities across deterministic geometric transforms."""
     import torch
 
-    model_size = config["model"]["input_size"]
-    output_height = config["submission"]["mask_height"]
-    output_width = config["submission"]["mask_width"]
-    rows = []
-    per_image_counts = {}
+    probabilities = []
+    for augmentation in augmentations:
+        if augmentation == "identity":
+            transformed = inputs
+            inverse_dimensions: tuple[int, ...] = ()
+        elif augmentation == "horizontal-flip":
+            inverse_dimensions = (-1,)
+            transformed = torch.flip(inputs, inverse_dimensions)
+        elif augmentation == "vertical-flip":
+            inverse_dimensions = (-2,)
+            transformed = torch.flip(inputs, inverse_dimensions)
+        elif augmentation == "horizontal-vertical-flip":
+            inverse_dimensions = (-2, -1)
+            transformed = torch.flip(inputs, inverse_dimensions)
+        else:
+            raise ValueError(f"Unsupported test-time augmentation: {augmentation}")
+
+        probability = torch.sigmoid(model(transformed))
+        if inverse_dimensions:
+            probability = torch.flip(probability, inverse_dimensions)
+        probabilities.append(probability)
+    return torch.stack(probabilities).mean(dim=0)
+
+
+def predict_validation_probabilities(
+    model,
+    validation_loader,
+    *,
+    device,
+    augmentations: list[str],
+) -> list[np.ndarray]:
+    """Predict one held-out fold in its stable dataset order."""
+    import torch
+
+    predictions = []
+    model.eval()
+    with torch.no_grad():
+        for images, _ in validation_loader:
+            probabilities = predict_with_tta(
+                model,
+                images.to(device, non_blocking=True),
+                augmentations=augmentations,
+            )
+            predictions.extend(probabilities[:, 0].cpu().numpy())
+    return predictions
+
+
+def instance_diagnostic(
+    predicted_instances: list[np.ndarray],
+    target_labels: np.ndarray,
+    *,
+    minimum_iou: float,
+) -> dict[str, float | int]:
+    """Greedily match instances and penalize both missed and extra predictions."""
+    target_ids = np.unique(target_labels)
+    target_ids = target_ids[target_ids != 0]
+    target_areas = {
+        int(target_id): int(np.count_nonzero(target_labels == target_id))
+        for target_id in target_ids
+    }
+    pairs = []
+    overlap_by_prediction = []
+    overlap_by_target = {int(target_id): 0 for target_id in target_ids}
+    for prediction_index, prediction in enumerate(predicted_instances):
+        prediction_area = int(prediction.sum())
+        overlapping_ids, intersections = np.unique(
+            target_labels[prediction != 0],
+            return_counts=True,
+        )
+        overlapping_targets = 0
+        for target_id, intersection in zip(overlapping_ids, intersections, strict=True):
+            target_id = int(target_id)
+            if target_id == 0:
+                continue
+            intersection = int(intersection)
+            union = prediction_area + target_areas[target_id] - intersection
+            iou = intersection / union
+            dice = (2.0 * intersection) / (prediction_area + target_areas[target_id])
+            if iou >= minimum_iou:
+                pairs.append((dice, iou, prediction_index, target_id))
+                overlapping_targets += 1
+                overlap_by_target[target_id] += 1
+        overlap_by_prediction.append(overlapping_targets)
+
+    matched_predictions = set()
+    matched_targets = set()
+    matched_dice = []
+    matched_iou = []
+    for dice, iou, prediction_index, target_id in sorted(pairs, reverse=True):
+        if prediction_index in matched_predictions or target_id in matched_targets:
+            continue
+        matched_predictions.add(prediction_index)
+        matched_targets.add(target_id)
+        matched_dice.append(dice)
+        matched_iou.append(iou)
+
+    predicted_count = len(predicted_instances)
+    target_count = len(target_ids)
+    denominator = max(predicted_count, target_count, 1)
+    return {
+        "penalized_dice": float(sum(matched_dice) / denominator),
+        "matched_dice_sum": float(sum(matched_dice)),
+        "matched_iou_sum": float(sum(matched_iou)),
+        "matched": len(matched_dice),
+        "missed": target_count - len(matched_targets),
+        "extra": predicted_count - len(matched_predictions),
+        "one_to_many": sum(count > 1 for count in overlap_by_target.values()),
+        "many_to_one": sum(count > 1 for count in overlap_by_prediction),
+    }
+
+
+def postprocessing_candidates(config: dict) -> list[dict]:
+    """Expand the versioned validation-only post-processing grid."""
+    grid = config["selection_grid"]
+    candidates = []
+    for threshold in grid["probability_thresholds"]:
+        for closing_kernel in grid["closing_kernels"]:
+            for minimum_area in grid["minimum_component_areas"]:
+                for minimum_mean_probability in grid["minimum_component_mean_probabilities"]:
+                    candidate = dict(config)
+                    candidate["probability_threshold"] = threshold
+                    candidate["closing_kernel"] = closing_kernel
+                    candidate["min_component_area_at_model_resolution"] = minimum_area
+                    candidate["minimum_component_mean_probability"] = minimum_mean_probability
+                    candidates.append(candidate)
+    return candidates
+
+
+def candidate_key(config: dict) -> str:
+    """Return a stable compact identifier for one post-processing candidate."""
+    return (
+        f"threshold={config['probability_threshold']:.2f},"
+        f"closing={config['closing_kernel']},"
+        f"min_area={config['min_component_area_at_model_resolution']},"
+        f"min_mean={config['minimum_component_mean_probability']:.2f}"
+    )
+
+
+def evaluate_postprocessing_grid(
+    probabilities: list[np.ndarray],
+    validation_samples: list[tuple[np.ndarray, np.ndarray, np.ndarray]],
+    *,
+    config: dict,
+) -> dict[str, dict[str, float | int]]:
+    """Evaluate candidate instance separation on grouped OOF predictions only."""
+    totals = {}
+    for candidate in postprocessing_candidates(config):
+        key = candidate_key(candidate)
+        aggregate: dict[str, float | int] = {
+            "images": 0,
+            "penalized_dice_sum": 0.0,
+            "matched_dice_sum": 0.0,
+            "matched_iou_sum": 0.0,
+            "matched": 0,
+            "missed": 0,
+            "extra": 0,
+            "one_to_many": 0,
+            "many_to_one": 0,
+        }
+        for probability, (image, _, target_labels) in zip(
+            probabilities,
+            validation_samples,
+            strict=True,
+        ):
+            predicted_instances = separate_instances(probability, image, config=candidate)
+            diagnostic = instance_diagnostic(
+                predicted_instances,
+                target_labels,
+                minimum_iou=config["matching_min_iou"],
+            )
+            aggregate["images"] += 1
+            for name, value in diagnostic.items():
+                aggregate[f"{name}_sum" if name == "penalized_dice" else name] += value
+        totals[key] = aggregate
+        mean_score = aggregate["penalized_dice_sum"] / aggregate["images"]
+        print(f"OOF candidate {key}: penalized_instance_dice={mean_score:.5f}")
+    return totals
+
+
+def merge_candidate_totals(
+    destination: dict[str, dict[str, float | int]],
+    source: dict[str, dict[str, float | int]],
+) -> None:
+    """Accumulate candidate diagnostics across held-out folds."""
+    for key, values in source.items():
+        aggregate = destination.setdefault(key, {name: 0 for name in values})
+        for name, value in values.items():
+            aggregate[name] += value
+
+
+def prepare_test_images(test_directory: Path, *, model_size: int) -> dict[str, np.ndarray]:
+    """Load final-inference images once as grayscale model inputs."""
     test_paths = sorted(test_directory.glob("*.jpeg"))
     if not test_paths:
         raise FileNotFoundError(f"No test JPEGs found in {test_directory}.")
+    prepared = {}
+    for image_path in test_paths:
+        with Image.open(image_path) as image:
+            resized = image.convert("L").resize(
+                (model_size, model_size),
+                Image.Resampling.BILINEAR,
+            )
+            prepared[image_path.stem] = np.asarray(resized, dtype=np.uint8)
+    return prepared
+
+
+def accumulate_test_probabilities(
+    model,
+    test_images: dict[str, np.ndarray],
+    probability_sums: dict[str, np.ndarray],
+    *,
+    device,
+    augmentations: list[str],
+) -> None:
+    """Add one fold model's final-inference probabilities to the ensemble."""
+    import torch
 
     model.eval()
     with torch.no_grad():
-        for index, image_path in enumerate(test_paths, start=1):
-            with Image.open(image_path) as image:
-                grayscale = image.convert("L")
-                resized = grayscale.resize(
-                    (model_size, model_size),
-                    Image.Resampling.BILINEAR,
-                )
-                image_array = np.asarray(resized, dtype=np.uint8)
-
+        for index, (image_id, image_array) in enumerate(test_images.items(), start=1):
             tensor = (
                 torch.from_numpy(image_array.copy()).float().unsqueeze(0).unsqueeze(0).to(device)
                 / 255.0
             )
-            probability = torch.sigmoid(model(tensor))[0, 0].cpu().numpy()
-            instances = separate_instances(
-                probability,
-                image_array,
-                config=config["postprocessing"],
+            probability = (
+                predict_with_tta(
+                    model,
+                    tensor,
+                    augmentations=augmentations,
+                )[0, 0]
+                .cpu()
+                .numpy()
             )
+            if image_id not in probability_sums:
+                probability_sums[image_id] = probability.astype(np.float32)
+            else:
+                probability_sums[image_id] += probability
+            if index % 30 == 0 or index == len(test_images):
+                print(f"Accumulated ensemble inference for {index}/{len(test_images)} images.")
 
-            seen_counts = set()
-            image_rows = []
-            for instance in instances:
-                resized_instance = cv2.resize(
-                    instance,
-                    (output_width, output_height),
-                    interpolation=cv2.INTER_NEAREST,
-                )
-                counts = encode_binary_mask(resized_instance)
-                if counts in seen_counts:
-                    raise ValueError(f"Duplicate predicted instance in {image_path.stem}.")
-                seen_counts.add(counts)
-                image_rows.append((f"{image_path.stem}_{len(image_rows) + 1}", counts))
-            rows.extend(image_rows)
-            per_image_counts[image_path.stem] = len(image_rows)
-            print(
-                f"Inference {index}/{len(test_paths)}: "
-                f"{image_path.name}, instances={len(image_rows)}"
+
+def rows_from_ensemble(
+    probability_sums: dict[str, np.ndarray],
+    test_images: dict[str, np.ndarray],
+    *,
+    fold_count: int,
+    postprocessing_config: dict,
+    submission_config: dict,
+):
+    """Average fold probabilities and encode separated full-resolution instances."""
+    output_height = submission_config["mask_height"]
+    output_width = submission_config["mask_width"]
+    rows = []
+    per_image_counts = {}
+    for index, (image_id, image_array) in enumerate(test_images.items(), start=1):
+        probability = probability_sums[image_id] / fold_count
+        instances = separate_instances(
+            probability,
+            image_array,
+            config=postprocessing_config,
+        )
+
+        seen_counts = set()
+        image_rows = []
+        for instance in instances:
+            resized_instance = cv2.resize(
+                instance,
+                (output_width, output_height),
+                interpolation=cv2.INTER_NEAREST,
             )
+            counts = encode_binary_mask(resized_instance)
+            if counts in seen_counts:
+                raise ValueError(f"Duplicate predicted instance in {image_id}.")
+            seen_counts.add(counts)
+            image_rows.append((f"{image_id}_{len(image_rows) + 1}", counts))
+        rows.extend(image_rows)
+        per_image_counts[image_id] = len(image_rows)
+        print(
+            f"Ensemble output {index}/{len(test_images)}: {image_id}, instances={len(image_rows)}"
+        )
 
     if not rows:
-        raise ValueError("The model predicted no filament instances in the complete test set.")
-    return rows, per_image_counts, {path.stem for path in test_paths}
+        raise ValueError("The ensemble predicted no instances in the complete test set.")
+    return rows, per_image_counts
 
 
 def validate_and_write_submission(
@@ -584,7 +948,7 @@ def validate_and_write_submission(
 
 
 def main() -> None:
-    """Train, validate, infer once, and create the first-submission artifact."""
+    """Fine-tune grouped folds, refine OOF post-processing, and ensemble test inference."""
     import torch
 
     started = time.time()
@@ -604,91 +968,173 @@ def main() -> None:
         n_splits=config["validation"]["n_splits"],
         seed=config["validation"]["seed"],
     )
-    fold_index = config["validation"]["fold_index"]
-    training_examples = [
-        example
-        for example in examples
-        if assignments[str(example["observation_key"])] != fold_index
-    ]
-    validation_examples = [
-        example
-        for example in examples
-        if assignments[str(example["observation_key"])] == fold_index
-    ]
-    training_groups = {str(example["observation_key"]) for example in training_examples}
-    validation_groups = {str(example["observation_key"]) for example in validation_examples}
-    if training_groups & validation_groups:
-        raise RuntimeError("Physical-observation leakage detected across the grouped split.")
-
-    print(
-        f"Train annotation sets={len(training_examples)}, "
-        f"validation annotation sets={len(validation_examples)}, "
-        f"fold fingerprint={fold_fingerprint}"
-    )
+    print(f"Fold fingerprint={fold_fingerprint}")
     prepared = prepare_examples(
         examples,
         image_directory=train_image_directory,
         original_size=config["competition"]["image_height"],
         model_size=config["model"]["input_size"],
     )
-    training_samples = [
-        sample
-        for sample, example in zip(prepared, examples, strict=True)
-        if assignments[str(example["observation_key"])] != fold_index
-    ]
-    validation_samples = [
-        sample
-        for sample, example in zip(prepared, examples, strict=True)
-        if assignments[str(example["observation_key"])] == fold_index
-    ]
-
     dataset_class = make_dataset_class()
-    training_dataset = dataset_class(
-        training_samples,
-        augment=True,
-        augmentation_config=config["training"]["augmentations"],
-    )
-    validation_dataset = dataset_class(
-        validation_samples,
-        augment=False,
-        augmentation_config=config["training"]["augmentations"],
-    )
-    loader_generator = torch.Generator().manual_seed(seed)
-    train_loader = torch.utils.data.DataLoader(
-        training_dataset,
-        batch_size=config["training"]["batch_size"],
-        shuffle=True,
-        num_workers=config["training"]["num_workers"],
-        pin_memory=torch.cuda.is_available(),
-        generator=loader_generator,
-    )
-    validation_loader = torch.utils.data.DataLoader(
-        validation_dataset,
-        batch_size=config["training"]["batch_size"],
-        shuffle=False,
-        num_workers=config["training"]["num_workers"],
-        pin_memory=torch.cuda.is_available(),
-    )
-
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Training device: {device}")
-    model = build_model(config["model"]["base_channels"]).to(device)
-    model, best_score, history = train_model(
-        model,
-        train_loader,
-        validation_loader,
-        config=config,
-        device=device,
-    )
-    checkpoint_path = Path("/kaggle/working/experiment-001-model.pt")
-    torch.save(model.state_dict(), checkpoint_path)
+    print(f"Training and inference device: {device}")
+    fold_indices = config["validation"]["fold_indices"]
+    if sorted(fold_indices) != list(range(config["validation"]["n_splits"])):
+        raise ValueError("Experiment-003 must cover every configured grouped fold exactly once.")
 
-    rows, per_image_counts, known_image_ids = infer_submission(
-        model,
-        test_directory=test_image_directory,
-        config=config,
-        device=device,
+    test_images = prepare_test_images(
+        test_image_directory,
+        model_size=config["model"]["input_size"],
     )
+    probability_sums: dict[str, np.ndarray] = {}
+    all_candidate_totals: dict[str, dict[str, float | int]] = {}
+    fold_results = []
+
+    for fold_index in fold_indices:
+        fold_seed = seed + fold_index
+        seed_everything(fold_seed)
+        if config["training"]["target_strategy"] != "annotator-soft-consensus":
+            raise ValueError("Experiment-003 requires annotator-soft-consensus targets.")
+        training_samples = consensus_training_samples(
+            prepared,
+            examples,
+            assignments,
+            validation_fold=fold_index,
+        )
+        validation_samples = [
+            sample
+            for sample, example in zip(prepared, examples, strict=True)
+            if assignments[str(example["observation_key"])] == fold_index
+        ]
+        print(
+            f"Fold {fold_index}: train annotation sets={len(training_samples)}, "
+            f"validation annotation sets={len(validation_samples)}"
+        )
+
+        training_dataset = dataset_class(
+            training_samples,
+            augment=True,
+            augmentation_config=config["training"]["augmentations"],
+        )
+        validation_dataset = dataset_class(
+            validation_samples,
+            augment=False,
+            augmentation_config=config["training"]["augmentations"],
+        )
+        train_loader = torch.utils.data.DataLoader(
+            training_dataset,
+            batch_size=config["training"]["batch_size"],
+            shuffle=True,
+            num_workers=config["training"]["num_workers"],
+            pin_memory=torch.cuda.is_available(),
+            generator=torch.Generator().manual_seed(fold_seed),
+        )
+        validation_loader = torch.utils.data.DataLoader(
+            validation_dataset,
+            batch_size=config["inference"]["batch_size"],
+            shuffle=False,
+            num_workers=0,
+            pin_memory=torch.cuda.is_available(),
+        )
+
+        model = build_model(config["model"]["base_channels"]).to(device)
+        checkpoint_path = resolve_checkpoint(config, fold_index)
+        model.load_state_dict(torch.load(checkpoint_path, map_location=device, weights_only=True))
+        print(f"Loaded competition-trained checkpoint: {checkpoint_path}")
+        model, best_score, best_epoch, history = train_model(
+            model,
+            train_loader,
+            validation_loader,
+            config=config,
+            device=device,
+        )
+        fine_tuned_checkpoint = Path(f"/kaggle/working/experiment-003-fold-{fold_index}.pt")
+        torch.save(model.state_dict(), fine_tuned_checkpoint)
+
+        validation_probabilities = predict_validation_probabilities(
+            model,
+            validation_loader,
+            device=device,
+            augmentations=config["inference"]["test_time_augmentations"],
+        )
+        validation_semantic_scores = [
+            float(
+                semantic_dice(
+                    probability[np.newaxis, np.newaxis],
+                    semantic_mask[np.newaxis, np.newaxis],
+                    threshold=0.5,
+                )[0]
+            )
+            for probability, (_, semantic_mask, _) in zip(
+                validation_probabilities,
+                validation_samples,
+                strict=True,
+            )
+        ]
+        fold_candidate_totals = evaluate_postprocessing_grid(
+            validation_probabilities,
+            validation_samples,
+            config=config["postprocessing"],
+        )
+        merge_candidate_totals(all_candidate_totals, fold_candidate_totals)
+        accumulate_test_probabilities(
+            model,
+            test_images,
+            probability_sums,
+            device=device,
+            augmentations=config["inference"]["test_time_augmentations"],
+        )
+        fold_results.append(
+            {
+                "fold": fold_index,
+                "seed": fold_seed,
+                "training_annotation_sets": len(training_samples),
+                "validation_annotation_sets": len(validation_samples),
+                "fine_tuning_best_epoch": best_epoch,
+                "best_fine_tuning_semantic_dice": best_score,
+                "tta_validation_semantic_dice": float(np.mean(validation_semantic_scores)),
+                "source_checkpoint": checkpoint_path.name,
+                "fine_tuned_checkpoint": fine_tuned_checkpoint.name,
+                "training_history": history,
+            }
+        )
+        del model, train_loader, validation_loader, validation_probabilities
+        torch.cuda.empty_cache()
+
+    candidate_summaries = []
+    for key, totals in all_candidate_totals.items():
+        summary = dict(totals)
+        summary["candidate"] = key
+        summary["mean_penalized_instance_dice"] = totals["penalized_dice_sum"] / totals["images"]
+        summary["mean_matched_instance_dice"] = totals["matched_dice_sum"] / max(
+            totals["matched"], 1
+        )
+        summary["mean_matched_instance_iou"] = totals["matched_iou_sum"] / max(totals["matched"], 1)
+        candidate_summaries.append(summary)
+    candidate_summaries.sort(
+        key=lambda item: item["mean_penalized_instance_dice"],
+        reverse=True,
+    )
+    selected_summary = candidate_summaries[0]
+    selected_config = next(
+        candidate
+        for candidate in postprocessing_candidates(config["postprocessing"])
+        if candidate_key(candidate) == selected_summary["candidate"]
+    )
+    print(
+        "Selected OOF post-processing: "
+        f"{selected_summary['candidate']}, "
+        f"penalized_instance_dice={selected_summary['mean_penalized_instance_dice']:.5f}"
+    )
+
+    rows, per_image_counts = rows_from_ensemble(
+        probability_sums,
+        test_images,
+        fold_count=len(fold_indices),
+        postprocessing_config=selected_config,
+        submission_config=config["submission"],
+    )
+    known_image_ids = set(test_images)
     submission_path = Path(config["submission"]["output_path"])
     validate_and_write_submission(
         rows,
@@ -703,18 +1149,36 @@ def main() -> None:
         "physical_observations": len(assignments),
         "annotation_sets": len(examples),
         "annotations": annotation_count,
-        "training_annotation_sets": len(training_examples),
-        "validation_annotation_sets": len(validation_examples),
-        "best_validation_semantic_dice": best_score,
+        "folds": fold_results,
+        "mean_best_fine_tuning_semantic_dice": float(
+            np.mean([result["best_fine_tuning_semantic_dice"] for result in fold_results])
+        ),
+        "mean_tta_fold_semantic_dice": float(
+            np.mean([result["tta_validation_semantic_dice"] for result in fold_results])
+        ),
+        "postprocessing_candidates": candidate_summaries,
+        "selected_postprocessing": {
+            "candidate": selected_summary["candidate"],
+            "mean_penalized_instance_dice": selected_summary["mean_penalized_instance_dice"],
+            "mean_matched_instance_dice": selected_summary["mean_matched_instance_dice"],
+            "mean_matched_instance_iou": selected_summary["mean_matched_instance_iou"],
+            "matched": selected_summary["matched"],
+            "missed": selected_summary["missed"],
+            "extra": selected_summary["extra"],
+            "one_to_many": selected_summary["one_to_many"],
+            "many_to_one": selected_summary["many_to_one"],
+        },
         "semantic_training_only": True,
         "instance_separation": "connected-components",
+        "checkpoint_source": config["model"]["competition_trained_checkpoint_source"],
+        "test_time_augmentations": config["inference"]["test_time_augmentations"],
+        "ensemble_folds": fold_indices,
         "test_images": len(known_image_ids),
         "submission_rows": len(rows),
         "predicted_instances_per_image": per_image_counts,
-        "training_history": history,
         "runtime_seconds": time.time() - started,
     }
-    metadata_path = Path("/kaggle/working/experiment-001-run-metadata.json")
+    metadata_path = Path("/kaggle/working/experiment-003-run-metadata.json")
     metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     print(f"Submission written to {submission_path} with {len(rows)} rows.")
     print(f"Run metadata written to {metadata_path}.")

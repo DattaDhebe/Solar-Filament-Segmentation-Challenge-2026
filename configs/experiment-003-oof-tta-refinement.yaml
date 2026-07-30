@@ -1,0 +1,120 @@
+experiment:
+  id: experiment-003
+  name: oof-tta-instance-refinement
+  seed: 20260730
+  output_root: outputs/experiments
+  mode: checkpoint-finetuning-and-refinement
+
+competition:
+  slug: filament-segmentation-2026
+  image_height: 2048
+  image_width: 2048
+  grayscale: true
+
+data:
+  local_root: data/raw/MAGFiLO_1.0_Kaggle_2026
+  kaggle_root: /kaggle/input/filament-segmentation-2026/MAGFiLO_1.0_Kaggle_2026
+  train_images: train/train_images
+  train_annotations: train/MAGFiLO_1.0_Annotations_kaggle2026_train.json
+  test_images: test/test_images
+  checkpoint_root: /kaggle/input/solar-filament-overnight-ensemble
+
+validation:
+  strategy: grouped-k-fold
+  group_key: file_name
+  n_splits: 5
+  fold_indices:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+  shuffle: true
+  seed: 20260729
+
+model:
+  task: instance-segmentation
+  architecture: small-unet
+  semantic_training_with_instance_separation: true
+  input_size: 1024
+  base_channels: 24
+  pretrained_weights: false
+  external_labeled_data: false
+  competition_trained_checkpoint_source: experiment-002
+
+training:
+  target_strategy: annotator-soft-consensus
+  epochs: 18
+  minimum_epochs: 8
+  early_stopping_patience: 4
+  batch_size: 2
+  learning_rate: 0.0002
+  weight_decay: 0.0001
+  bce_positive_weight: 4.0
+  dice_loss_weight: 1.0
+  bce_loss_weight: 1.0
+  num_workers: 0
+  mixed_precision: true
+  augmentations:
+    horizontal_flip_probability: 0.5
+    vertical_flip_probability: 0.5
+    rotate_90_probability: 0.5
+    brightness_delta: 0.05
+    contrast_range:
+      - 0.9
+      - 1.1
+
+inference:
+  batch_size: 2
+  test_time_augmentations:
+    - identity
+    - horizontal-flip
+    - vertical-flip
+    - horizontal-vertical-flip
+
+postprocessing:
+  probability_threshold: 0.6
+  closing_kernel: 5
+  closing_iterations: 1
+  disk_erosion_pixels: 8
+  min_component_area_at_model_resolution: 32
+  max_component_area_at_model_resolution: 40000
+  minimum_component_mean_probability: 0.0
+  connectivity: 8
+  matching_min_iou: 0.1
+  selection_grid:
+    probability_thresholds:
+      - 0.5
+      - 0.6
+      - 0.7
+    closing_kernels:
+      - 5
+      - 7
+    minimum_component_areas:
+      - 32
+      - 64
+      - 96
+      - 128
+    minimum_component_mean_probabilities:
+      - 0.0
+      - 0.7
+      - 0.8
+
+metric:
+  primary: mean-matched-instance-dice
+  diagnostics:
+    - semantic-dice-distribution
+    - matched-instance-dice
+    - matched-instance-iou
+    - missed-and-extra-instances
+    - one-to-many-relations
+    - many-to-one-relations
+
+submission:
+  columns:
+    - filament_id
+    - segmentation_rle
+  rle_format: coco-compressed-counts
+  mask_height: 2048
+  mask_width: 2048
+  output_path: /kaggle/working/experiment-003-submission.csv

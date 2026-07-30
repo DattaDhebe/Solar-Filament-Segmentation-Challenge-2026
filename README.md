@@ -37,8 +37,13 @@ between training and test observations.
 - Experiment 001 trained a small U-Net from scratch on one fixed grouped fold
   and reached 0.6403 semantic Dice at 512 × 512. This is a local diagnostic, not
   the organizer's complete instance-matching score.
-- The first mechanically validated submission was accepted by Kaggle as
-  reference `55089873` and remains pending. No leaderboard score or rank is
+- Experiment 002 trained five grouped 1024 × 1024 models from scratch and
+  reached 0.6481 mean fold semantic Dice, 0.4304 penalized OOF instance Dice,
+  and a verified public score of 0.62.
+- Experiment 003 is a private Kaggle run that fine-tunes all five models using
+  soft annotator-consensus targets, then applies TTA and validation-selected
+  instance refinement. No result is claimed while it is running.
+- Experiment 001 has a verified public score of 0.52. No leaderboard rank is
   claimed.
 
 ## Competition essentials
@@ -50,6 +55,10 @@ between training and test observations.
 - Masks use COCO compressed RLE counts for a fixed size of 2048 × 2048 pixels.
 - Final judging is 70% quantitative and 30% qualitative. Quantitative review
   includes Dice, IoU, and fragmentation/over-segmentation distributions.
+- The public metric currently rewards empty or severely under-predicted
+  submissions. The organizer says the leaderboard is only a preliminary filter;
+  this project therefore selects models with grouped OOF instance diagnostics,
+  not by exploiting the public score.
 - At most five submissions may be made per day and two may be selected as final.
 - The solution repository must be public at competition close for final
   evaluation.

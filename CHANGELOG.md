@@ -22,3 +22,10 @@
   instances, and generates a mechanically validated submission.
 - Ran experiment 001 and recorded its train-only fold fingerprint and semantic
   validation diagnostic without treating it as the organizer's matching score.
+- Added experiment 002: five grouped 1024 × 1024 models, OOF instance
+  diagnostics, validation-selected post-processing, and ensemble inference.
+- Added experiment 003: continued five-fold training with soft
+  annotator-consensus targets, TTA, component-confidence filtering, and an
+  expanded OOF post-processing search.
+- Documented the organizer's prohibition on external MAGFiLO ground truth and
+  the known empty-mask public-metric failure.
