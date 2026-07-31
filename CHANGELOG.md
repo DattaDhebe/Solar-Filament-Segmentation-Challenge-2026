@@ -40,6 +40,13 @@
   experiment-005 OOF probabilities, a 135-candidate blend/component-filter
   calibration grid, source-result regression checks, interruption-safe OOF
   evidence, and strict output validation.
+- Recorded experiment 006's valid 0.4918 grouped-OOF Dice result and verified
+  0.66 public score, which tied experiment 003 despite slightly improving every
+  tracked OOF instance diagnostic.
+- Prepared experiment 007: five boundary-aware three-head U-Nets, deterministic
+  instance-boundary and normalized-distance targets, a connected-components
+  control, 96 seeded-partition candidates, strict promotion checks, and output
+  validation.
 - Documented the organizer's prohibition on external MAGFiLO ground truth and
   the known empty-mask public-metric failure.
 - Added a durable safe command and experiment history with Kaggle run,

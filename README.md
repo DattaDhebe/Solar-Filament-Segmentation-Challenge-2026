@@ -50,9 +50,12 @@ between training and test observations.
 - Experiment 005 completed with 0.4905 penalized OOF instance Dice, 1,609
   misses, and 2,309 extras. Its recall improved over experiment 003, but the
   predeclared Dice and extra-instance promotion checks failed.
-- Experiment 006 is prepared to blend experiment-003 and experiment-005
-  probabilities and select stricter component filtering from 135 grouped-OOF
-  candidates, with both source results checked before selection.
+- Experiment 006 blended experiment-003 and experiment-005 probabilities. It
+  improved all tracked OOF instance diagnostics slightly, but its verified
+  public score tied experiment 003 at 0.66.
+- Experiment 007 is prepared as the first boundary-aware model: five
+  three-head U-Nets learn foreground, instance boundaries, and normalized
+  interior distance before an OOF-selected seeded partitioner.
 - Experiment 001 has a verified public score of 0.52. No leaderboard rank is
   claimed.
 
@@ -85,6 +88,8 @@ the experiment-005 private-kernel and artifact-validation workflow.
 See [docs/experiment-006-operations.md](docs/experiment-006-operations.md) for
 the reviewed experiment-006 push, status, download, validation, and submission
 commands.
+See [docs/experiment-007-operations.md](docs/experiment-007-operations.md) for
+the boundary-aware private-kernel and artifact-validation workflow.
 
 ## Local setup
 

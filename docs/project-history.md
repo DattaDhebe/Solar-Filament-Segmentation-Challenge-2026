@@ -1932,3 +1932,113 @@ status: KernelWorkerStatus.RUNNING
 
 This action created a Kaggle kernel version only. No competition submission,
 leaderboard score, or rank is claimed.
+
+## Experiment 006 completed result and submission - 2026-07-31
+
+Private kernel version 1 completed in 6,270.9 seconds (104.5 minutes). Both
+source-reference candidates reproduced their exact recorded grouped-OOF Dice,
+missed, and extra counts before blend selection. Of 135 candidates, exactly one
+met the predeclared missed/extra feasibility constraints.
+
+Selected setting:
+
+```text
+experiment-003 probability weight: 0.75
+experiment-005 probability weight: 0.25
+foreground threshold: 0.50
+closing kernel: 7
+minimum component area: 96
+minimum component mean probability: 0.80
+```
+
+| Metric | Experiment 003 | Experiment 006 |
+| --- | ---: | ---: |
+| Penalized OOF instance Dice | 0.490129 | 0.491750 |
+| Matched-instance Dice | 0.721510 | 0.722413 |
+| Matched-instance IoU | 0.581948 | 0.582996 |
+| Missed instances | 1,693 | 1,681 |
+| Extra instances | 2,103 | 2,095 |
+| One-to-many relations | 510 | 514 |
+| Many-to-one relations | 117 | 120 |
+| Test masks | 1,332 | 1,341 |
+
+The strict promotion gate failed only because Dice remained below the absolute
+0.495 requirement. The candidate nevertheless improved Dice, matched overlap,
+misses, and extras over experiment 003, passed canonical-RLE validation, and
+was chosen for one exploratory submission after checking that five submissions
+were allowed.
+
+```text
+submission reference: 55137658
+file: experiment-006-submission.csv
+status: SubmissionStatus.COMPLETE
+verified public score: 0.66
+private score: not available
+```
+
+The public score tied experiment 003. This is evidence that probability blends
+and small component-filter changes are saturated; the next experiment must
+change learned instance separation rather than repeat threshold calibration.
+
+## Experiment 007 preparation - 2026-07-31
+
+Experiment 007 implements the previously documented boundary-aware hypothesis,
+renumbered from the earlier roadmap because experiment 006 became the blend
+calibration run. It is a substantive model and instance-separation change.
+
+### Decision journal
+
+| Evidence | Change | Reason |
+| --- | --- | --- |
+| Experiments 003 and 006 both scored 0.66 despite a larger post-processing search. | Replace the one-channel semantic output with foreground, boundary, and normalized instance-distance heads. | The model must learn evidence that connected components cannot express. |
+| Official annotations contain separate filament polygons. | Derive a per-instance morphological boundary and per-instance normalized distance transform from each official annotator mask. | These targets require no external labels and preserve annotator-specific instance structure. |
+| Experiment 005 showed a small recall benefit from annotator-specific supervision. | Use the fixed 0.75 consensus / 0.25 deterministic annotator foreground loss; train boundary and distance heads against the same epoch-selected annotator. | The foreground head retains consensus stability while auxiliary heads see coherent instances. |
+| The experiment-003 U-Net already provides useful solar-filament features. | Load its encoder, decoder, and semantic head exactly; allow only the new boundary and distance heads to be missing and randomly initialized. | This isolates the boundary-aware change and avoids external pretrained weights. |
+| Learned seeds can over-split thin filaments or disappear. | Compare one connected-components control with 96 seeded settings spanning boundary threshold, distance threshold, seed closing, minimum seed area, instance area, and confidence. | The control quantifies whether the new heads genuinely improve instance separation. |
+| A higher Dice candidate could worsen recall or false positives. | Prefer candidates with at most 1,681 misses and 2,095 extras, then maximize penalized instance Dice. | Selection must preserve experiment 006's balanced error profile. |
+| Semantic Dice alone cannot justify this experiment. | Require seeded partitioning, Dice at least 0.500, and no regression in missed, extra, one-to-many, or many-to-one counts. | Promotion demands evidence that the learned instance heads improve actual instance behavior. |
+| Test observations are inference-only. | Complete training and all 97 grouped-OOF evaluations, write OOF evidence, and only then load test JPEGs. | Test statistics cannot affect training, early stopping, method selection, or promotion. |
+
+Prepared files:
+
+```text
+configs/experiment-007-boundary-seeded-unet.yaml
+kaggle/experiment_007.py
+tests/test_experiment_007.py
+scripts/validate_experiment_007_output.py
+docs/experiment-007-operations.md
+```
+
+The ignored `kaggle/kernel-metadata.json` points to private GPU kernel
+`dattadhebe/solar-filament-boundary-seeded-unet`, has internet disabled, and
+uses only `dattadhebe/solar-filament-oof-tta-refinement/1` as an upstream
+competition-trained checkpoint source. No experiment-007 kernel push or
+competition submission was performed during preparation.
+
+Local experiment-007 validation:
+
+```powershell
+.\.venv\Scripts\ruff.exe format .
+.\.venv\Scripts\ruff.exe check .
+.\.venv\Scripts\pytest.exe tests\test_experiment_007.py -q
+.\scripts\validate.ps1
+git diff --check
+git status --short
+```
+
+Results:
+
+```text
+Ruff: all checks passed
+Experiment-007 synthetic tests: 9 passed
+Repository synthetic suite: 54 passed
+Train/test audit: 707/180 grayscale JPEGs; zero stem or exact-hash overlap
+Configuration SHA-256:
+ff6d24135e3406d71f1c47c33633e61a80f68e2aa713142f0d86e1884645856a
+```
+
+The local environment intentionally does not execute real model training or
+OpenCV inference. Those remain private-Kaggle GPU operations. Local tests cover
+configuration parity, source-weight isolation, candidate-grid cardinality,
+deterministic annotator selection, confidence filtering, constrained OOF
+selection, relation-aware promotion, and the OOF-before-test boundary.
