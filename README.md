@@ -44,6 +44,9 @@ between training and test observations.
   targets, then applied TTA and validation-selected instance refinement. It
   reached 0.4901 penalized OOF instance Dice and a verified public score of
   0.66.
+- Experiment 004 is prepared for private Kaggle execution. It reuses the frozen
+  experiment-003 checkpoints, cross-fits component-quality scores by grouped
+  fold, and selects optional fragment linking only from OOF annotations.
 - Experiment 001 has a verified public score of 0.52. No leaderboard rank is
   claimed.
 
@@ -68,6 +71,9 @@ See [docs/competition.md](docs/competition.md) for the verified rules, timeline,
 data schema, and source links.
 See [docs/project-history.md](docs/project-history.md) for the safe command log,
 experiment results, Kaggle run/submission references, and raw-log locations.
+See [docs/experiment-004-operations.md](docs/experiment-004-operations.md) for
+the exact private-kernel push, status, download, validation, and approved
+submission commands for experiment 004.
 
 ## Local setup
 

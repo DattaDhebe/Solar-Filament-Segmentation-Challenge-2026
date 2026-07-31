@@ -27,6 +27,10 @@
 - Added experiment 003: continued five-fold training with soft
   annotator-consensus targets, TTA, component-confidence filtering, and an
   expanded OOF post-processing search.
+- Prepared experiment 004: frozen experiment-003 checkpoint inference,
+  annotator-aware OOF component targets, fold-cross-fitted component-quality
+  ranking, conservative fragment linking, a strict output validator, and an
+  operational push/check/submission command guide.
 - Documented the organizer's prohibition on external MAGFiLO ground truth and
   the known empty-mask public-metric failure.
 - Added a durable safe command and experiment history with Kaggle run,

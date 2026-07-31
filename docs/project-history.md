@@ -1615,3 +1615,61 @@ git diff --check
 Do not tune against test observations or the broken public metric. Promote a
 candidate only when grouped OOF instance quality, morphology, stability, and
 reproducibility support it.
+
+## Experiment 004 preparation - 2026-07-30
+
+Status: source prepared locally; no Kaggle kernel push or competition
+submission has been performed for experiment 004.
+
+The experiment follows the first item in the documented roadmap. It keeps the
+five experiment-003 U-Net checkpoints frozen and targets the remaining instance
+error profile with an OOF-trained component-quality model plus a conservative
+fragment-linking screen. This is deliberately a checkpoint-inference and
+stacking experiment rather than another segmentation-model fine-tuning run.
+
+### Decision journal
+
+| Evidence | Change | Reason |
+| --- | --- | --- |
+| Experiment 003 retained 2,103 unmatched extra instances. | Generate a permissive component pool and estimate a continuous component-quality score. | A learned OOF quality estimate can use shape and probability evidence jointly instead of relying on one area/confidence cutoff. |
+| The same physical JPEG can have multiple annotators. | Average each candidate's maximum IoU across that observation's official annotation sets. | The target respects annotator variation while keeping all duplicate records in one grouped fold. |
+| Training and evaluating a component ranker on the same rows would be optimistic. | Train the ranker on four OOF feature folds and predict the untouched fifth, repeated across all folds. | Every OOF selection score remains cross-fitted by immutable `file_name` fold. |
+| Fragmentation remains part of final judging. | Screen optional endpoint-distance, tangent-alignment, and gap-probability linking. | The link is accepted only inside the estimated solar disk and selected using grouped OOF annotations. |
+| Test observations are inference-only. | Freeze the OOF-selected quality cutoff and linking setting before loading final test predictions into the output stage. | No test statistic, feature selection, normalization fit, threshold, or post-processing choice can influence promotion. |
+
+### Files prepared
+
+| File | Purpose |
+| --- | --- |
+| `configs/experiment-004-component-quality.yaml` | Freezes checkpoint provenance, grouped folds/fingerprint, candidate pool, component features, ranker, linking grid, diagnostics, and promotion gate. |
+| `kaggle/experiment_004.py` | Self-contained private-kernel source for OOF inference, annotator-aware targets, cross-fitting, OOF selection, frozen test inference, canonical RLE output, and run metadata. |
+| `tests/test_experiment_004.py` | Checks embedded/versioned config parity, disabled training/external sources, deterministic finite features, cross-fit group isolation, sparse diagnostics, and disk-boundary-safe linking. |
+| `scripts/validate_experiment_004_output.py` | Validates provenance, fold fingerprint, configuration hash, OOF evidence, promotion gate, metadata/CSV agreement, and every 2048-square RLE. |
+| `docs/experiment-004-operations.md` | Stores the exact push, status, output-download, validation, allowance, submission, and confirmation commands. |
+| `kaggle/kernel-metadata.json` | Locally points the private kernel at `experiment_004.py` and the experiment-003 v1 kernel output; it remains intentionally ignored by Git. |
+
+### Commands used during preparation
+
+```powershell
+git status --short
+rg --files
+git log -5 --oneline
+
+Get-Content configs\experiment-003-oof-tta-refinement.yaml
+Get-Content configs\experiment-002-overnight-ensemble.yaml
+Get-Content kaggle\first_submission.py
+Get-Content tests\test_kaggle_kernel.py
+
+.\.venv\Scripts\ruff.exe format kaggle\experiment_004.py
+.\.venv\Scripts\ruff.exe check kaggle\experiment_004.py
+.\.venv\Scripts\pytest.exe tests\test_experiment_004.py -q
+.\scripts\validate.ps1
+git diff --check
+git status --short
+```
+
+The push, completion check, output validation, and submission commands are
+versioned in `docs/experiment-004-operations.md`. A kernel push still requires
+explicit approval after the completed local validation and source review. A
+competition submission requires a second explicit approval after the generated
+candidate and grouped-OOF evidence have been reviewed.
