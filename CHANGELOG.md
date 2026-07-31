@@ -31,6 +31,15 @@
   annotator-aware OOF component targets, fold-cross-fitted component-quality
   ranking, conservative fragment linking, a strict output validator, and an
   operational push/check/submission command guide.
+- Prepared experiment 005: two-stage hybrid consensus/annotator fine-tuning,
+  reuse of selected screen models, full five-fold OOF confirmation, an
+  interruption-safe OOF metadata checkpoint, and strict output validation.
+- Recorded experiment 005's completed grouped-OOF result and failed promotion
+  gate: recall improved, but extra instances rose above experiment 003.
+- Prepared experiment 006: deterministic reconstruction of experiment-003 and
+  experiment-005 OOF probabilities, a 135-candidate blend/component-filter
+  calibration grid, source-result regression checks, interruption-safe OOF
+  evidence, and strict output validation.
 - Documented the organizer's prohibition on external MAGFiLO ground truth and
   the known empty-mask public-metric failure.
 - Added a durable safe command and experiment history with Kaggle run,

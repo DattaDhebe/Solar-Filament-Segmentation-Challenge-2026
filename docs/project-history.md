@@ -1673,3 +1673,262 @@ versioned in `docs/experiment-004-operations.md`. A kernel push still requires
 explicit approval after the completed local validation and source review. A
 competition submission requires a second explicit approval after the generated
 candidate and grouped-OOF evidence have been reviewed.
+
+## Experiment 004 cancelled run - 2026-07-30
+
+Kaggle run `dattadhebe/solar-filament-component-quality/1` ended with
+`KernelWorkerStatus.CANCEL_ACKNOWLEDGED`. The user reported that they did not
+cancel it. The Kaggle status API returned no failure message, GPU quota still
+had 8.55 hours remaining, no newer account kernel was present, and the log
+contained no Python, CUDA, memory, or timeout error.
+
+The run completed all OOF work before Kaggle stopped it during final output
+encoding at test observation 75 of 180:
+
+```text
+selected quality cutoff: 0.25
+fragment linking: disabled
+OOF penalized instance Dice: 0.501474
+missed instances: 1,807
+extra instances: 1,673
+promotion gate: failed
+```
+
+Relative to experiment 003, extras fell by 430 but misses rose by 114. The
+predeclared gate failed because Dice remained below 0.505 and misses increased
+by more than 5%. No complete submission CSV or final metadata existed, so the
+cancelled artifact was not eligible for submission and an identical rerun was
+not recommended.
+
+Read-only investigation commands:
+
+```powershell
+.\.venv\Scripts\kaggle.exe kernels status `
+  dattadhebe/solar-filament-component-quality
+
+.\.venv\Scripts\kaggle.exe kernels output `
+  dattadhebe/solar-filament-component-quality/1 `
+  -p outputs\kaggle\experiment-004-v1-cancelled
+
+.\.venv\Scripts\kaggle.exe kernels logs `
+  dattadhebe/solar-filament-component-quality/1
+
+.\.venv\Scripts\kaggle.exe quota --format json
+.\.venv\Scripts\kaggle.exe kernels list `
+  --user dattadhebe --sort-by dateRun --page-size 20
+```
+
+The cancelled log remains under ignored output storage:
+
+```text
+outputs/kaggle/experiment-004-v1-cancelled/
+solar-filament-component-quality.log
+```
+
+## Experiment 005 preparation - 2026-07-31
+
+Experiment 005 responds directly to the recall regression in experiments 003
+and 004. It uses only the five experiment-003 competition-trained checkpoints
+and the fixed grouped-fold fingerprint.
+
+The kernel screens two predeclared hybrid loss pairs on folds 0 and 1:
+
+```text
+consensus 0.75 / annotator 0.25
+consensus 0.50 / annotator 0.50
+```
+
+Each training observation supplies the soft consensus mask and one
+deterministic epoch-seeded annotator mask. The pair with higher screen-fold OOF
+penalized instance Dice is selected. Its fold-0/1 models are reused, and only
+folds 2 through 4 require additional training, giving seven fold-training runs
+instead of nine. All five selected models use the frozen experiment-003
+post-processing settings so the supervision change is isolated.
+
+Prepared files:
+
+```text
+configs/experiment-005-hybrid-annotator.yaml
+kaggle/experiment_005.py
+tests/test_experiment_005.py
+scripts/validate_experiment_005_output.py
+docs/experiment-005-operations.md
+```
+
+The kernel writes `experiment-005-oof-metadata.json` immediately after
+five-fold confirmation and before test inference. This preserves the selection
+decision and all OOF evidence if Kaggle interrupts the final stage.
+
+Experiment 004 was committed before experiment-005 development:
+
+```text
+c9b0149  feat: add cross-fitted component quality experiment
+```
+
+Local experiment-005 validation:
+
+```powershell
+.\.venv\Scripts\ruff.exe format .
+.\.venv\Scripts\ruff.exe check .
+.\.venv\Scripts\pytest.exe tests\test_experiment_005.py -q
+.\scripts\validate.ps1
+git diff --check
+git status --short
+```
+
+The full gate passed with 38 synthetic tests plus the complete read-only data
+audit: 707 train observations, 180 test observations, immutable grouped folds,
+and no filename or exact-hash split overlap.
+
+## Experiment 005 completed result - 2026-07-31
+
+Kaggle kernel `dattadhebe/solar-filament-hybrid-annotator/1` completed without
+Python, CUDA, memory, NaN, or output-encoding errors. It selected the
+`consensus=0.75, annotator=0.25` hybrid pair and produced 1,386 canonical test
+instance masks in 5,911.5 seconds (98.5 minutes).
+
+The strict validator stopped because the predeclared promotion gate failed; it
+did not indicate a corrupt candidate. Validation without the optional gate
+requirement confirmed the complete CSV and every RLE.
+
+| Metric | Experiment 003 | Experiment 005 | Decision evidence |
+| --- | ---: | ---: | --- |
+| Penalized OOF instance Dice | 0.490129 | 0.490488 | Only a marginal increase and below the 0.500 gate |
+| Matched-instance Dice | 0.7215 | 0.7225 | Slight overlap improvement |
+| Matched-instance IoU | 0.5819 | 0.5830 | Slight overlap improvement |
+| Missed instances | 1,693 | 1,609 | Recall improved by 84 instances |
+| Extra instances | 2,103 | 2,309 | False-positive/fragment count worsened by 206 |
+| Test predictions | 1,332 | 1,386 | Mechanically valid; not used for selection |
+
+Promotion checks were `false/true/false` for Dice, misses, and extras. The
+experiment is retained as useful recall evidence and a checkpoint source, but
+experiment 003 remains the promoted submitted candidate until a better grouped
+OOF result is validated.
+
+Commands used to diagnose and validate the result:
+
+```powershell
+.\.venv\Scripts\python.exe `
+  .\scripts\validate_experiment_005_output.py `
+  outputs\kaggle\experiment-005-v1 `
+  --test-image-directory `
+  data\raw\MAGFiLO_1.0_Kaggle_2026\test\test_images `
+  --require-promotion-gate
+
+.\.venv\Scripts\python.exe `
+  .\scripts\validate_experiment_005_output.py `
+  outputs\kaggle\experiment-005-v1 `
+  --test-image-directory `
+  data\raw\MAGFiLO_1.0_Kaggle_2026\test\test_images
+```
+
+Evidence remains in ignored output storage:
+
+```text
+outputs/kaggle/experiment-005-v1/experiment-005-oof-metadata.json
+outputs/kaggle/experiment-005-v1/experiment-005-run-metadata.json
+outputs/kaggle/experiment-005-v1/experiment-005-submission.csv
+outputs/kaggle/experiment-005-v1/solar-filament-hybrid-annotator.log
+```
+
+## Experiment 006 preparation - 2026-07-31
+
+Experiment 006 uses experiment 005's recall gain while targeting its extra
+components. It does not perform another checkpoint fine-tune. Instead, it
+reconstructs OOF probability maps from both completed checkpoint families and
+selects one probability blend plus stricter post-processing setting entirely
+from the immutable grouped OOF observations.
+
+### Decision journal
+
+| Evidence | Change | Reason |
+| --- | --- | --- |
+| Experiment 003 has fewer extras; experiment 005 has fewer misses. | Search experiment-005 probability weights `0.0, 0.25, 0.5, 0.75, 1.0`. | A probability blend can retain complementary precision and recall before connected-component separation. |
+| Experiment 005 exceeded the extra-instance baseline by 206. | Search thresholds `0.50, 0.525, 0.55`, component areas `96, 128, 160`, and component mean confidences `0.80, 0.825, 0.85`; keep the OOF-selected closing kernel fixed at 7. | The compact 135-candidate grid targets small or weak components without introducing unrelated changes. |
+| A wrong source version could invalidate calibration. | Require the grid endpoints to reproduce experiments 003 and 005 within `1e-5` Dice and exact missed/extra counts. | Test inference is blocked if checkpoint provenance or deterministic OOF reconstruction changes. |
+| Selecting unconstrained Dice can keep an unacceptable error tradeoff. | Prefer candidates with at most 1,692 misses and 2,103 extras, then maximize penalized instance Dice. | The selection directly preserves the recall improvement while restoring experiment-003 precision. |
+| OOF tuning introduces selection optimism. | Keep the grid compact and require a separate promotion threshold of 0.495 plus both count constraints. | A candidate is promoted only when the gain is large enough to justify a new competition submission. |
+| Test images are inference-only. | Write the complete OOF selection artifact before loading any test JPEG. | Test statistics cannot influence blend, filtering, or promotion. |
+
+Prepared files:
+
+```text
+configs/experiment-006-oof-blend-calibration.yaml
+kaggle/experiment_006.py
+tests/test_experiment_006.py
+scripts/validate_experiment_006_output.py
+docs/experiment-006-operations.md
+```
+
+The ignored `kaggle/kernel-metadata.json` now points to private kernel
+`dattadhebe/solar-filament-oof-blend-calibration` with GPU enabled, internet
+disabled, and exactly these two upstream private-kernel output sources:
+
+```text
+dattadhebe/solar-filament-oof-tta-refinement/1
+dattadhebe/solar-filament-hybrid-annotator/1
+```
+
+No Kaggle push or competition submission was performed during preparation.
+
+Local experiment-006 validation completed successfully:
+
+```powershell
+.\.venv\Scripts\ruff.exe format `
+  kaggle\experiment_006.py `
+  scripts\validate_experiment_006_output.py `
+  tests\test_experiment_006.py
+
+.\.venv\Scripts\ruff.exe check `
+  kaggle\experiment_006.py `
+  scripts\validate_experiment_006_output.py `
+  tests\test_experiment_006.py
+
+.\.venv\Scripts\pytest.exe tests\test_experiment_006.py -q
+.\scripts\validate.ps1
+git diff --check
+git status --short
+```
+
+Results:
+
+```text
+Ruff: all checks passed
+Experiment-006 synthetic tests: 7 passed
+Repository synthetic suite: 45 passed
+Train/test audit: 707/180 grayscale JPEGs; zero stem or exact-hash overlap
+Configuration SHA-256:
+673e16d2a6f3a5ffc9dc3ff68c227fffbb2b97c3b80080f007137b3431263e99
+```
+
+The 135-candidate loop caches the Otsu-derived, eroded solar-disk mask once per
+training observation. This is a runtime optimization only: it does not change
+any probability, threshold, connected component, OOF diagnostic, or selection
+rule.
+
+## Experiment 006 Kaggle push - 2026-07-31
+
+After explicit user approval, private kernel version 1 was pushed successfully:
+
+```powershell
+.\.venv\Scripts\kaggle.exe kernels push `
+  -p kaggle `
+  --accelerator NvidiaTeslaT4 `
+  --timeout 43200
+
+.\.venv\Scripts\kaggle.exe kernels status `
+  dattadhebe/solar-filament-oof-blend-calibration
+```
+
+Verified immediately after the push:
+
+```text
+kernel: dattadhebe/solar-filament-oof-blend-calibration/1
+visibility: private
+GPU: NVIDIA T4 requested
+internet: disabled
+status: KernelWorkerStatus.RUNNING
+```
+
+This action created a Kaggle kernel version only. No competition submission,
+leaderboard score, or rank is claimed.

@@ -44,9 +44,15 @@ between training and test observations.
   targets, then applied TTA and validation-selected instance refinement. It
   reached 0.4901 penalized OOF instance Dice and a verified public score of
   0.66.
-- Experiment 004 is prepared for private Kaggle execution. It reuses the frozen
-  experiment-003 checkpoints, cross-fits component-quality scores by grouped
-  fold, and selects optional fragment linking only from OOF annotations.
+- Experiment 004 reduced extras but increased misses; Kaggle cancelled it during
+  final encoding, leaving no complete candidate, and its OOF promotion gate
+  failed.
+- Experiment 005 completed with 0.4905 penalized OOF instance Dice, 1,609
+  misses, and 2,309 extras. Its recall improved over experiment 003, but the
+  predeclared Dice and extra-instance promotion checks failed.
+- Experiment 006 is prepared to blend experiment-003 and experiment-005
+  probabilities and select stricter component filtering from 135 grouped-OOF
+  candidates, with both source results checked before selection.
 - Experiment 001 has a verified public score of 0.52. No leaderboard rank is
   claimed.
 
@@ -74,6 +80,11 @@ experiment results, Kaggle run/submission references, and raw-log locations.
 See [docs/experiment-004-operations.md](docs/experiment-004-operations.md) for
 the exact private-kernel push, status, download, validation, and approved
 submission commands for experiment 004.
+See [docs/experiment-005-operations.md](docs/experiment-005-operations.md) for
+the experiment-005 private-kernel and artifact-validation workflow.
+See [docs/experiment-006-operations.md](docs/experiment-006-operations.md) for
+the reviewed experiment-006 push, status, download, validation, and submission
+commands.
 
 ## Local setup
 
