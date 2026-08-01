@@ -47,6 +47,10 @@
   instance-boundary and normalized-distance targets, a connected-components
   control, 96 seeded-partition candidates, strict promotion checks, and output
   validation.
+- Prepared experiment 008: a from-scratch 1024/base-32 versus 1280/base-24
+  capacity/resolution screen, fixed hybrid targets and post-processing,
+  five-fold confirmation, interruption-safe OOF metadata, and strict output
+  validation.
 - Documented the organizer's prohibition on external MAGFiLO ground truth and
   the known empty-mask public-metric failure.
 - Added a durable safe command and experiment history with Kaggle run,

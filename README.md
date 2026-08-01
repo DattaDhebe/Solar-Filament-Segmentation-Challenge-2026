@@ -53,9 +53,11 @@ between training and test observations.
 - Experiment 006 blended experiment-003 and experiment-005 probabilities. It
   improved all tracked OOF instance diagnostics slightly, but its verified
   public score tied experiment 003 at 0.66.
-- Experiment 007 is prepared as the first boundary-aware model: five
-  three-head U-Nets learn foreground, instance boundaries, and normalized
-  interior distance before an OOF-selected seeded partitioner.
+- Experiment 007 tested boundary-aware three-head U-Nets and seeded
+  partitioning; its grouped OOF gate failed, so it was not submitted.
+- Experiment 008 is a controlled capacity/resolution ablation: 1024×1024 with
+  32 base channels versus 1280×1280 with 24, using fixed targets and
+  post-processing.
 - Experiment 001 has a verified public score of 0.52. No leaderboard rank is
   claimed.
 
@@ -90,6 +92,8 @@ the reviewed experiment-006 push, status, download, validation, and submission
 commands.
 See [docs/experiment-007-operations.md](docs/experiment-007-operations.md) for
 the boundary-aware private-kernel and artifact-validation workflow.
+See [docs/experiment-008-operations.md](docs/experiment-008-operations.md) for
+the capacity/resolution private-kernel and artifact-validation workflow.
 
 ## Local setup
 

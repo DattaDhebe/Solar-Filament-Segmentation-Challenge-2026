@@ -948,7 +948,7 @@ Required additional reporting:
 - Dice distribution for single-annotator versus multi-annotator observations;
 - the exact screen folds and decision made before full confirmation.
 
-### Experiment 006: boundary-aware instance model
+### Experiment 007: boundary-aware instance model
 
 Why:
 
@@ -997,7 +997,7 @@ Start by initializing the shared encoder/decoder from experiment 003 and adding
 new randomly initialized heads. If optimization is unstable, run a clean
 from-scratch control on one predeclared fold before spending on all five.
 
-### Experiment 007: resolution and capacity ablation
+### Experiment 008: resolution and capacity ablation
 
 Do this only after experiment 004 or 006 improves instance handling; otherwise a
 larger semantic model may simply generate more fragments.
@@ -1030,7 +1030,7 @@ Multi-scale TTA can be tested afterward as a separate inference-only variant.
 Do not combine capacity, resolution, new augmentation, and new post-processing
 in one run because the source of any gain would be unknowable.
 
-### Experiment 008: official-training-only self-supervised pretraining
+### Experiment 009: official-training-only self-supervised pretraining
 
 This is lower priority and must use only the 707 official training JPEGs.
 Competition test images must remain inference-only and cannot be included in
@@ -2057,3 +2057,90 @@ Immediate status verification returned `KernelWorkerStatus.RUNNING`. The kernel
 is private, GPU-enabled, internet-disabled, and uses only the experiment-003
 private kernel output as its checkpoint source. No competition submission was
 made.
+
+## Experiment 008 preparation - 2026-08-01
+
+Experiment 007 did not clear its instance-quality gate, so the next run is a
+controlled capacity/resolution ablation rather than another post-processing
+search. Two settings are screened on folds 0 and 1 with identical grouped
+targets, augmentations, TTA, and Experiment-006 post-processing:
+
+```text
+1024-base32: 1024x1024 input, 32 base channels
+1280-base24: 1280x1280 input, 24 base channels
+```
+
+Both settings initialize from scratch so resolution and model capacity are not
+confounded by incompatible checkpoint shapes. The selected setting is reused
+for folds 2, 3, and 4. Promotion requires a predeclared +0.005 semantic Dice
+gain on each screen fold, at least 0.495 full OOF penalized instance Dice, and
+no increase beyond experiment-006's 1,681 misses or 2,095 extras. OOF metadata
+is written before any test image is loaded.
+
+Prepared files:
+
+```text
+configs/experiment-008-capacity-resolution.yaml
+kaggle/experiment_008.py
+tests/test_experiment_008.py
+scripts/validate_experiment_008_output.py
+docs/experiment-008-operations.md
+```
+
+The ignored `kaggle/kernel-metadata.json` is prepared for private GPU kernel
+`dattadhebe/solar-filament-capacity-resolution-ablation`, with internet disabled
+and no upstream checkpoint source. No experiment-008 push or submission has
+been performed during preparation.
+
+Local experiment-008 validation completed before any push:
+
+```powershell
+.\.venv\Scripts\ruff.exe format kaggle\experiment_008.py scripts\validate_experiment_008_output.py tests\test_experiment_008.py
+.\.venv\Scripts\ruff.exe check kaggle\experiment_008.py scripts\validate_experiment_008_output.py tests\test_experiment_008.py
+.\.venv\Scripts\pytest.exe tests\test_experiment_008.py -q
+.\scripts\validate.ps1
+git diff --check
+```
+
+Results: Ruff passed; the focused Experiment-008 tests passed (6 tests); the
+full synthetic suite passed (60 tests); the train/test audit found 707/180
+grayscale JPEGs with zero stem or exact-hash overlap. Configuration SHA-256:
+
+```text
+61742bc77455d569b11dbc4ee04c39e6f6e0d69ec8be990e729fce2806399f6e
+```
+
+Real training and inference remain private-Kaggle GPU operations. At this
+preparation point, no experiment-008 kernel push or competition submission had
+been performed.
+
+## Experiment 008 Kaggle result - 2026-08-01
+
+The approved private kernel completed successfully as:
+
+```text
+dattadhebe/solar-filament-capacity-resolution-ablation/1
+```
+
+Downloaded artifacts passed the complete local validator:
+
+```text
+selected setting: 1024-base32
+OOF penalized instance Dice: 0.495771
+matched instance Dice: 0.724427
+matched instance IoU: 0.583907
+missed instances: 1,669
+extra instances: 1,935
+one-to-many: 406
+many-to-one: 150
+test masks: 1,293
+runtime: 18,257 seconds (about 5.07 hours)
+```
+
+The full Dice, missed, and extra checks passed, but the required screen
+semantic gate did not: 1024-base32 reached 0.658474 and 0.655585 semantic Dice
+on folds 0 and 1, while the baselines plus the required margin were 0.664203
+and 0.662890. The 1280-base24 setting was lower still (0.648923 and 0.650400).
+Therefore `promotion_gate.passed` is false and no Experiment-008 competition
+submission was made. Kaggle submission history still contains only experiments
+001, 002, 003, and 006.
