@@ -20,7 +20,7 @@ Get-Content kaggle\kernel-metadata.json
 The private metadata must use:
 
 ```text
-kernel: dattadhebe/solar-filament-boundary-seeded-unet
+kernel: dattadhebe/solar-filament-boundary-seeded-u-net
 source: dattadhebe/solar-filament-oof-tta-refinement/1
 GPU: enabled
 internet: disabled
@@ -39,7 +39,7 @@ internet: disabled
 
 ```powershell
 .\.venv\Scripts\kaggle.exe kernels status `
-  dattadhebe/solar-filament-boundary-seeded-unet
+  dattadhebe/solar-filament-boundary-seeded-u-net
 
 .\.venv\Scripts\kaggle.exe quota --format json
 ```
@@ -48,7 +48,7 @@ After status becomes `COMPLETE`:
 
 ```powershell
 .\.venv\Scripts\kaggle.exe kernels output `
-  dattadhebe/solar-filament-boundary-seeded-unet/1 `
+  dattadhebe/solar-filament-boundary-seeded-u-net/1 `
   -p outputs\kaggle\experiment-007-v1
 ```
 

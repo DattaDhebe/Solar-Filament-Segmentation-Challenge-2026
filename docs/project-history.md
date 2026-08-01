@@ -2010,7 +2010,7 @@ docs/experiment-007-operations.md
 ```
 
 The ignored `kaggle/kernel-metadata.json` points to private GPU kernel
-`dattadhebe/solar-filament-boundary-seeded-unet`, has internet disabled, and
+`dattadhebe/solar-filament-boundary-seeded-u-net`, has internet disabled, and
 uses only `dattadhebe/solar-filament-oof-tta-refinement/1` as an upstream
 competition-trained checkpoint source. No experiment-007 kernel push or
 competition submission was performed during preparation.
@@ -2042,3 +2042,18 @@ OpenCV inference. Those remain private-Kaggle GPU operations. Local tests cover
 configuration parity, source-weight isolation, candidate-grid cardinality,
 deterministic annotator selection, confidence filtering, constrained OOF
 selection, relation-aware promotion, and the OOF-before-test boundary.
+
+## Experiment 007 Kaggle push - 2026-07-31
+
+After explicit user approval, the private T4 kernel was pushed successfully.
+Kaggle normalized the title to a `u-net` slug, so the verified version-1 kernel
+identifier is:
+
+```text
+dattadhebe/solar-filament-boundary-seeded-u-net/1
+```
+
+Immediate status verification returned `KernelWorkerStatus.RUNNING`. The kernel
+is private, GPU-enabled, internet-disabled, and uses only the experiment-003
+private kernel output as its checkpoint source. No competition submission was
+made.
