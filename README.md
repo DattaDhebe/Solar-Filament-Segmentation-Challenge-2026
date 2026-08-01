@@ -57,7 +57,8 @@ between training and test observations.
   partitioning; its grouped OOF gate failed, so it was not submitted.
 - Experiment 008 is a controlled capacity/resolution ablation: 1024×1024 with
   32 base channels versus 1280×1280 with 24, using fixed targets and
-  post-processing.
+  post-processing. Its validated 1024-base32 candidate scored 0.66 publicly,
+  tying experiments 003 and 006.
 - Experiment 001 has a verified public score of 0.52. No leaderboard rank is
   claimed.
 

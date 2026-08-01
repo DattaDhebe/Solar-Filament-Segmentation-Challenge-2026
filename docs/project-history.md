@@ -2142,5 +2142,7 @@ semantic gate did not: 1024-base32 reached 0.658474 and 0.655585 semantic Dice
 on folds 0 and 1, while the baselines plus the required margin were 0.664203
 and 0.662890. The 1280-base24 setting was lower still (0.648923 and 0.650400).
 Therefore `promotion_gate.passed` is false and no Experiment-008 competition
-submission was made. Kaggle submission history still contains only experiments
-001, 002, 003, and 006.
+submission was made at that point. After separate user approval, the validated
+CSV was submitted as reference `55159480`; Kaggle marked it complete with public
+score `0.66`, tying experiments 003 and 006. No private score or rank is
+claimed.

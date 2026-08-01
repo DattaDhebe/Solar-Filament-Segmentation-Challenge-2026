@@ -51,6 +51,8 @@
   capacity/resolution screen, fixed hybrid targets and post-processing,
   five-fold confirmation, interruption-safe OOF metadata, and strict output
   validation.
+- Recorded experiment 008 submission `55159480`: the validated 1024-base32
+  candidate scored 0.66 publicly, tying experiments 003 and 006.
 - Documented the organizer's prohibition on external MAGFiLO ground truth and
   the known empty-mask public-metric failure.
 - Added a durable safe command and experiment history with Kaggle run,
