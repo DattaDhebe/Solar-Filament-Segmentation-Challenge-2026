@@ -53,6 +53,9 @@
   validation.
 - Recorded experiment 008 submission `55159480`: the validated 1024-base32
   candidate scored 0.66 publicly, tying experiments 003 and 006.
+- Prepared experiment 009: a five-fold low-learning-rate continuation from
+  the selected Experiment-008 checkpoints, with fixed data, augmentations,
+  TTA, post-processing, OOF gating, and artifact validation.
 - Documented the organizer's prohibition on external MAGFiLO ground truth and
   the known empty-mask public-metric failure.
 - Added a durable safe command and experiment history with Kaggle run,

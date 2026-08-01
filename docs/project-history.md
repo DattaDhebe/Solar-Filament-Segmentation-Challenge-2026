@@ -764,7 +764,8 @@ competition submission is considered.
 | 2 | 005 | Hybrid consensus/annotator supervision can recover filaments lost by the stronger experiment-003 filtering. | 3-6 T4 hours for a screen; 6-10 hours for five-fold confirmation | Penalized OOF Dice above the promoted 004 result and lower misses without restoring 003-level extras |
 | 3 | 006 | A boundary-aware multi-head U-Net can separate touching filaments better than connected components of one semantic channel. | 8-12 T4 hours | Better penalized Dice plus lower one-to-many and many-to-one rates on the same folds |
 | 4 | 007 | More spatial detail or model capacity can improve thin-filament recall after the instance pipeline is reliable. | 8-12 T4 hours per confirmed setting | At least +0.005 mean OOF semantic Dice and a positive instance-Dice change |
-| 5 | 008 | Self-supervised pretraining on official training JPEGs can improve feature quality without external labels or test leakage. | 8-12 hours pretraining plus supervised confirmation | Consistent gain across at least four of five folds and improved instance metrics |
+| 5 | 009 | A low-learning-rate continuation of the selected 1024/base32 models can recover additional optimization gains without changing the instance pipeline. | 3-6 T4 hours | OOF Dice ≥0.498 with no missed/extra regression versus 008 |
+| 6 | 010 | Self-supervised pretraining on official training JPEGs can improve feature quality without external labels or test leakage. | 8-12 hours pretraining plus supervised confirmation | Consistent gain across at least four of five folds and improved instance metrics |
 
 The gates are intentionally stricter than “public score increased.” They can be
 revised before implementation, but must be fixed before examining test
@@ -1030,7 +1031,7 @@ Multi-scale TTA can be tested afterward as a separate inference-only variant.
 Do not combine capacity, resolution, new augmentation, and new post-processing
 in one run because the source of any gain would be unknowable.
 
-### Experiment 009: official-training-only self-supervised pretraining
+### Experiment 010: official-training-only self-supervised pretraining
 
 This is lower priority and must use only the 707 official training JPEGs.
 Competition test images must remain inference-only and cannot be included in
@@ -2146,3 +2147,32 @@ submission was made at that point. After separate user approval, the validated
 CSV was submitted as reference `55159480`; Kaggle marked it complete with public
 score `0.66`, tying experiments 003 and 006. No private score or rank is
 claimed.
+
+## Experiment 009 preparation - 2026-08-01
+
+The public score plateaued at 0.66 even though Experiment 008 improved the
+grouped OOF diagnostics. Experiment 009 therefore changes the optimization
+budget only: it loads each selected 1024-base32 Experiment-008 fold checkpoint,
+continues for 14 epochs at learning rate `0.00005`, and keeps all targets,
+augmentations, folds, TTA, and post-processing fixed.
+
+Promotion is predeclared at OOF penalized instance Dice `0.498`, with missed
+instances no higher than `1,669` and extras no higher than `1,935`. The runner
+writes OOF metadata before test inference and uses only the private
+Experiment-008 kernel output as its checkpoint source.
+
+Prepared files:
+
+```text
+configs/experiment-009-low-lr-continuation.yaml
+kaggle/experiment_009.py
+tests/test_experiment_009.py
+scripts/validate_experiment_009_output.py
+docs/experiment-009-operations.md
+```
+
+Local validation completed before any push: Ruff passed, the focused
+Experiment-009 tests passed (5 tests), the full synthetic suite passed (65
+tests), and the train/test audit remained 707/180 grayscale JPEGs with zero
+stem or exact-hash overlap. No Experiment-009 kernel push or submission has
+been performed.

@@ -59,6 +59,9 @@ between training and test observations.
   32 base channels versus 1280×1280 with 24, using fixed targets and
   post-processing. Its validated 1024-base32 candidate scored 0.66 publicly,
   tying experiments 003 and 006.
+- Experiment 009 changes only the optimization budget: it continues the
+  selected 1024/base32 checkpoints with a lower learning rate and fixed
+  post-processing.
 - Experiment 001 has a verified public score of 0.52. No leaderboard rank is
   claimed.
 
@@ -95,6 +98,8 @@ See [docs/experiment-007-operations.md](docs/experiment-007-operations.md) for
 the boundary-aware private-kernel and artifact-validation workflow.
 See [docs/experiment-008-operations.md](docs/experiment-008-operations.md) for
 the capacity/resolution private-kernel and artifact-validation workflow.
+See [docs/experiment-009-operations.md](docs/experiment-009-operations.md) for
+the low-learning-rate continuation workflow.
 
 ## Local setup
 
