@@ -2115,6 +2115,135 @@ Real training and inference remain private-Kaggle GPU operations. At this
 preparation point, no experiment-008 kernel push or competition submission had
 been performed.
 
+## Experiment 009 Kaggle result - 2026-08-01
+
+Kaggle normalized the pushed title to:
+
+```text
+dattadhebe/solar-filament-low-learning-rate-continuation/1
+```
+
+The run completed and its downloaded artifacts passed structural validation,
+but the optimization continuation regressed the primary OOF metric:
+
+```text
+OOF penalized instance Dice: 0.489115
+matched instance Dice: 0.727545
+matched instance IoU: 0.588071
+missed instances: 1,670
+extra instances: 2,114
+one-to-many: 438
+many-to-one: 140
+test masks: 1,300
+runtime: 5,915 seconds (about 1.64 hours)
+```
+
+The predeclared gate failed on Dice, missed instances, and extras. No
+Experiment-009 competition submission was made. Experiment-008 remains the
+best public candidate at 0.66 and the best grouped OOF candidate among these
+two continuation runs.
+
+## Experiment 010 preparation - 2026-08-01
+
+The low-learning-rate continuation regressed, so Experiment 010 changes the
+post-processing strategy while keeping the Experiment-008 model probabilities
+fixed. It screens 144 grouped-OOF candidates spanning four declared axes:
+
+```text
+probability threshold: 0.40, 0.45, 0.50, 0.55
+closing kernel: 5, 7, 9
+minimum component area: 64, 96, 128
+minimum mean component confidence: 0.70, 0.75, 0.80, 0.85
+```
+
+Selection requires OOF Dice `>=0.498`, missed instances no higher than `1,669`,
+and extras no higher than `1,935`; if no candidate clears the gate, the runner
+falls back to the declared Experiment-008 baseline candidate and marks the
+promotion gate false. Test inference starts only after the complete candidate
+grid and selected OOF metadata are written.
+
+Prepared files:
+
+```text
+configs/experiment-010-postprocessing-calibration.yaml
+kaggle/experiment_010.py
+tests/test_experiment_010.py
+scripts/validate_experiment_010_output.py
+docs/experiment-010-operations.md
+```
+
+Local Experiment-010 validation completed before any push: Ruff passed, the
+focused tests passed (5 tests), the full synthetic suite passed (70 tests), and
+the train/test audit remained 707/180 grayscale JPEGs with zero stem or
+exact-hash overlap. Configuration SHA-256:
+
+```text
+c303821883baee7ff21defe8f4a77941d4e703d692bd96df495598dd00981ec4
+```
+
+No Experiment-010 kernel push or competition submission has been performed.
+
+## Experiment 010 Kaggle result - 2026-08-01
+
+The private calibration kernel completed successfully as:
+
+```text
+dattadhebe/solar-filament-postprocessing-calibration/1
+```
+
+All 144 candidates were evaluated on grouped OOF probabilities. No candidate
+passed the predeclared Dice/missed/extra gate, so the runner selected the
+Experiment-008 baseline candidate and produced 1,293 structurally valid masks:
+
+```text
+selected candidate: threshold=0.50, closing=7, area=96, confidence=0.80
+OOF penalized instance Dice: 0.495773
+matched instance Dice: 0.724429
+matched instance IoU: 0.583909
+missed instances: 1,669
+extra instances: 1,935
+runtime: 8,278 seconds (about 2.30 hours)
+```
+
+The strongest raw candidate reached OOF Dice `0.500331`, but missed `1,740`
+instances and therefore violated the recall constraint. It was not selected or
+submitted. No Experiment-010 competition submission was made.
+
+## Experiment 011 preparation - 2026-08-01
+
+Experiments 009 and 010 did not improve the validated Experiment-008
+candidate. Experiment 011 therefore keeps the Experiment-008 `1024-base32`
+checkpoints and fixed post-processing unchanged, and screens only inference
+scale. It evaluates baseline four-way flips at scale `1.0`, plus two three-scale
+variants (`0.75/1.0/1.25` and `0.875/1.0/1.125`) on all five grouped OOF folds.
+The selected variant is written to OOF metadata before any test image is
+loaded; test observations cannot affect selection.
+
+The predeclared promotion gate is OOF penalized instance Dice `>=0.498`, with
+missed instances `<=1,669` and extras `<=1,935`. If no variant passes, the
+runner retains the baseline and produces no submission recommendation.
+
+Prepared files:
+
+```text
+configs/experiment-011-multiscale-tta.yaml
+kaggle/experiment_011.py
+tests/test_experiment_011.py
+scripts/validate_experiment_011_output.py
+docs/experiment-011-operations.md
+```
+
+Local validation completed before any push: Ruff passed, the focused
+Experiment-011 tests passed (6 tests), the full synthetic suite passed (76
+tests), and the train/test audit remained 707/180 grayscale JPEGs with zero
+stem or exact-hash overlap. Configuration SHA-256:
+
+```text
+d421426148fdd560194e18372bf82c953e060c791368aaa2af4ec98316a4d429
+```
+
+No Experiment-011 kernel push or competition submission has been performed.
+
 ## Experiment 008 Kaggle result - 2026-08-01
 
 The approved private kernel completed successfully as:

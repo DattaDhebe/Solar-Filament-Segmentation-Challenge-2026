@@ -19,7 +19,7 @@ Get-Content kaggle\kernel-metadata.json
 The private metadata should use:
 
 ```text
-kernel: dattadhebe/solar-filament-low-lr-continuation
+kernel: dattadhebe/solar-filament-low-learning-rate-continuation
 GPU: enabled
 internet: disabled
 kernel source: dattadhebe/solar-filament-capacity-resolution-ablation/1
@@ -38,10 +38,10 @@ kernel source: dattadhebe/solar-filament-capacity-resolution-ablation/1
 
 ```powershell
 .\.venv\Scripts\kaggle.exe kernels status `
-  dattadhebe/solar-filament-low-lr-continuation
+  dattadhebe/solar-filament-low-learning-rate-continuation
 
 .\.venv\Scripts\kaggle.exe kernels output `
-  dattadhebe/solar-filament-low-lr-continuation/1 `
+  dattadhebe/solar-filament-low-learning-rate-continuation/1 `
   -p outputs\kaggle\experiment-009-v1
 ```
 

@@ -1,0 +1,121 @@
+experiment:
+  id: experiment-010
+  name: postprocessing-calibration
+  seed: 20260805
+  output_root: outputs/experiments
+  mode: oof-postprocessing-calibration
+
+competition:
+  slug: filament-segmentation-2026
+  image_height: 2048
+  image_width: 2048
+  grayscale: true
+
+data:
+  local_root: data/raw/MAGFiLO_1.0_Kaggle_2026
+  kaggle_root: /kaggle/input/filament-segmentation-2026/MAGFiLO_1.0_Kaggle_2026
+  train_images: train/train_images
+  train_annotations: train/MAGFiLO_1.0_Annotations_kaggle2026_train.json
+  test_images: test/test_images
+  checkpoint_root: /kaggle/input/solar-filament-capacity-resolution-ablation
+
+validation:
+  strategy: grouped-k-fold
+  group_key: file_name
+  n_splits: 5
+  fold_indices:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+  shuffle: true
+  seed: 20260729
+  expected_fold_fingerprint: 69a31d113fd4e4cea63f1a072d94dd0dea2c1432c18d349d8a2575c5d1915aa7
+
+model:
+  task: instance-segmentation
+  architecture: small-unet-postprocessing-calibration
+  semantic_training_with_instance_separation: true
+  input_size: 1024
+  base_channels: 32
+  pretrained_weights: false
+  external_labeled_data: false
+  initialization: experiment-008-selected
+  checkpoint_experiment: experiment-008
+
+inference:
+  batch_size: 1
+  test_time_augmentations:
+    - identity
+    - horizontal-flip
+    - vertical-flip
+    - horizontal-vertical-flip
+
+postprocessing:
+  source: experiment-006-selected
+  probability_threshold: 0.5
+  closing_kernel: 7
+  closing_iterations: 1
+  disk_erosion_pixels: 8
+  min_component_area_at_model_resolution: 96
+  max_component_area_at_model_resolution: 40000
+  minimum_component_mean_probability: 0.8
+  connectivity: 8
+  matching_min_iou: 0.1
+
+calibration:
+  selection_metric: mean-penalized-instance-dice
+  grid:
+    probability_thresholds:
+      - 0.4
+      - 0.45
+      - 0.5
+      - 0.55
+    closing_kernels:
+      - 5
+      - 7
+      - 9
+    minimum_component_areas:
+      - 64
+      - 96
+      - 128
+    minimum_component_mean_probabilities:
+      - 0.7
+      - 0.75
+      - 0.8
+      - 0.85
+  baseline_candidate:
+    probability_threshold: 0.5
+    closing_kernel: 7
+    min_component_area_at_model_resolution: 96
+    minimum_component_mean_probability: 0.8
+
+promotion:
+  baseline_experiment: experiment-008
+  baseline_mean_penalized_instance_dice: 0.4957709510589161
+  baseline_missed_instances: 1669
+  baseline_extra_instances: 1935
+  minimum_mean_penalized_instance_dice: 0.498
+  maximum_missed_instances: 1669
+  maximum_extra_instances: 1935
+
+metric:
+  primary: mean-matched-instance-dice
+  diagnostics:
+    - semantic-dice-distribution
+    - matched-instance-dice
+    - matched-instance-iou
+    - missed-and-extra-instances
+    - one-to-many-relations
+    - many-to-one-relations
+    - single-versus-multi-annotator-dice
+
+submission:
+  columns:
+    - filament_id
+    - segmentation_rle
+  rle_format: coco-compressed-counts
+  mask_height: 2048
+  mask_width: 2048
+  output_path: /kaggle/working/experiment-010-submission.csv

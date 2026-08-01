@@ -62,6 +62,10 @@ between training and test observations.
 - Experiment 009 changes only the optimization budget: it continues the
   selected 1024/base32 checkpoints with a lower learning rate and fixed
   post-processing.
+- Experiment 010 calibrates only post-processing for the fixed Experiment 008
+  probabilities using a 144-candidate grouped-OOF grid.
+- Experiment 011 screens multi-scale flip TTA variants on the fixed
+  Experiment-008 checkpoints, with no additional training or test tuning.
 - Experiment 001 has a verified public score of 0.52. No leaderboard rank is
   claimed.
 
@@ -100,6 +104,10 @@ See [docs/experiment-008-operations.md](docs/experiment-008-operations.md) for
 the capacity/resolution private-kernel and artifact-validation workflow.
 See [docs/experiment-009-operations.md](docs/experiment-009-operations.md) for
 the low-learning-rate continuation workflow.
+See [docs/experiment-010-operations.md](docs/experiment-010-operations.md) for
+the OOF post-processing calibration workflow.
+See [docs/experiment-011-operations.md](docs/experiment-011-operations.md) for
+the multi-scale TTA workflow.
 
 ## Local setup
 

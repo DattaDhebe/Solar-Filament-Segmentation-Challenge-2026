@@ -56,6 +56,12 @@
 - Prepared experiment 009: a five-fold low-learning-rate continuation from
   the selected Experiment-008 checkpoints, with fixed data, augmentations,
   TTA, post-processing, OOF gating, and artifact validation.
+- Prepared experiment 010: a 144-candidate grouped-OOF post-processing
+  calibration for the fixed Experiment-008 probabilities, with strict
+  candidate provenance and submission validation.
+- Prepared experiment 011: a three-variant multi-scale flip-TTA screen using
+  fixed Experiment-008 checkpoints, grouped OOF selection, and strict output
+  validation.
 - Documented the organizer's prohibition on external MAGFiLO ground truth and
   the known empty-mask public-metric failure.
 - Added a durable safe command and experiment history with Kaggle run,
