@@ -18,7 +18,7 @@ Get-Content kaggle\kernel-metadata.json
 Private metadata:
 
 ```text
-kernel: dattadhebe/solar-filament-attention-unetplusplus-watershed
+kernel: dattadhebe/solar-filament-attention-unetpp-watershed
 GPU: enabled
 internet: disabled
 ```
@@ -36,10 +36,10 @@ internet: disabled
 
 ```powershell
 .\.venv\Scripts\kaggle.exe kernels status `
-  dattadhebe/solar-filament-attention-unetplusplus-watershed
+  dattadhebe/solar-filament-attention-unetpp-watershed
 
 .\.venv\Scripts\kaggle.exe kernels output `
-  dattadhebe/solar-filament-attention-unetplusplus-watershed `
+  dattadhebe/solar-filament-attention-unetpp-watershed `
   -p outputs\kaggle\experiment-014-v1
 ```
 
