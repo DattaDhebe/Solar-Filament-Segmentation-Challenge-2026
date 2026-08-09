@@ -1451,15 +1451,15 @@ def train_fold(
 
 
 def main() -> None:
-    """Train 5-fold Attention U-Net, evaluate OOF, then infer on test."""
+    """Train 5-fold Attention UNet++, evaluate OOF, then infer on test."""
     import torch
 
     started = time.time()
     config = yaml.safe_load(EMBEDDED_CONFIG_YAML)
-    if config["experiment"]["id"] != "experiment-013":
-        raise ValueError("Embedded configuration must identify experiment-013.")
+    if config["experiment"]["id"] != "experiment-014":
+        raise ValueError("Embedded configuration must identify experiment-014.")
     if config["model"]["initialization"] != "from-scratch":
-        raise ValueError("Experiment-013 must use from-scratch initialization.")
+        raise ValueError("Experiment-014 must use from-scratch initialization.")
     if config["model"]["pretrained_weights"] or config["model"]["external_labeled_data"]:
         raise ValueError("External or supervised pretrained data is forbidden.")
     if not np.isclose(
