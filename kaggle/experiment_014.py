@@ -480,7 +480,7 @@ def build_model(base_channels: int):
             self.mask_head = nn.Conv2d(c, 1, 1)
             self.dist_head = nn.Conv2d(c, 1, 1)
             # Deep supervision auxiliary head
-            self.aux_head = nn.Conv2d(c, 1, 1)
+            self.aux_head = nn.Conv2d(c * 2, 1, 1)
 
         def forward(self, inputs):
             x0_0 = self.conv0_0(inputs)
@@ -537,7 +537,7 @@ def build_model(base_channels: int):
 
             mask_logit = self.mask_head(x0_4)
             dist_pred = torch.sigmoid(self.dist_head(x0_4))
-            aux_logit = self.aux_head(x0_3)
+            aux_logit = self.aux_head(x1_3)
 
             return mask_logit, dist_pred, aux_logit
 
