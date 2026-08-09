@@ -19,6 +19,7 @@ stores only concise, reviewable decisions.
 | 011 | Multi-scale flip TTA screen for fixed Experiment-008 checkpoints | Compare baseline scale 1.0 with two three-scale variants on all five grouped OOF folds; fixed post-processing and no training | Prepared; Kaggle result pending | Promote only if a TTA variant reaches OOF Dice ≥0.498 without exceeding 1,669 missed or 1,935 extra instances |
 | 012 | Solar disk CLAHE preprocessing & patch-based 2048×2048 pipeline | Same five grouped folds; 1024×1024 patch cropping on native 2048×2048 images with overlapping window inference | All 5 folds trained successfully; OOF Dice 0.3000, 6,007 missed instances due to patch context loss; promotion gate failed | Do not submit; retain model weights for feature extraction and pipeline diagnostics |
 | 013 | Deep Supervision Attention U-Net with Distance-Map Watershed Instance Separation | Same five grouped folds; 1024×1024 input, Attention Gates, Focal-Tversky loss (α=0.3, β=0.7), distance transform head + Watershed | Prepared; local validation passed | Promote if grouped OOF penalized instance Dice ≥ 0.505 with missed instances ≤ 1,400 |
+| 014 | Deep Supervision Attention UNet++ with Distance-Map Watershed Instance Separation | Same five grouped folds; 1024×1024 input, Attention UNet++ with nested dense skip connections, Focal-Tversky loss (α=0.3, β=0.7), distance transform head + Watershed | Prepared; local validation passed | Promote if grouped OOF penalized instance Dice ≥ 0.510 with missed instances ≤ 1,400 |
 
 For each real experiment, record:
 
