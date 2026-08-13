@@ -44,6 +44,8 @@ outputs/*
 !outputs/README.md
 artifacts/
 checkpoints/
+kaggle_output_check/
+submissions/
 *.ckpt
 *.pt
 *.pth

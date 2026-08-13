@@ -81,11 +81,11 @@ training:
   target_strategy: hybrid-consensus-random-annotator
   consensus_weight: 0.75
   annotator_weight: 0.25
-  epochs: 18
+  epochs: 15
   minimum_epochs: 8
   early_stopping_patience: 4
   batch_size: 1
-  gradient_accumulation_steps: 2
+  gradient_accumulation_steps: 4
   learning_rate: 0.00015
   weight_decay: 0.0001
   tversky_alpha: 0.3
@@ -95,7 +95,7 @@ training:
   bce_positive_weight: 4.0
   distance_loss_weight: 0.5
   deep_supervision_weight: 0.3
-  num_workers: 0
+  num_workers: 2
   mixed_precision: true
   augmentations:
     horizontal_flip_probability: 0.5
@@ -116,15 +116,15 @@ inference:
 
 postprocessing:
   source: experiment-013-watershed
-  probability_threshold: 0.45
+  probability_threshold: 0.35
   watershed_enabled: true
-  watershed_seed_threshold: 0.30
+  watershed_seed_threshold: 0.25
   closing_kernel: 7
   closing_iterations: 1
   disk_erosion_pixels: 8
-  min_component_area_at_model_resolution: 96
+  min_component_area_at_model_resolution: 48
   max_component_area_at_model_resolution: 40000
-  minimum_component_mean_probability: 0.50
+  minimum_component_mean_probability: 0.40
   connectivity: 8
   matching_min_iou: 0.1
 
@@ -172,7 +172,7 @@ def seed_everything(seed: int) -> None:
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.benchmark = True
     torch.backends.cudnn.deterministic = True
 
 
@@ -383,10 +383,10 @@ def build_model(base_channels: int):
             super().__init__()
             self.layers = nn.Sequential(
                 nn.Conv2d(input_channels, output_channels, 3, padding=1, bias=False),
-                nn.BatchNorm2d(output_channels),
+                nn.GroupNorm(8, output_channels),
                 nn.ReLU(inplace=True),
                 nn.Conv2d(output_channels, output_channels, 3, padding=1, bias=False),
-                nn.BatchNorm2d(output_channels),
+                nn.GroupNorm(8, output_channels),
                 nn.ReLU(inplace=True),
             )
 
@@ -396,17 +396,18 @@ def build_model(base_channels: int):
     class AttentionGate(nn.Module):
         def __init__(self, F_g: int, F_l: int, F_int: int) -> None:
             super().__init__()
+            groups = min(8, F_int)
             self.W_g = nn.Sequential(
                 nn.Conv2d(F_g, F_int, kernel_size=1, bias=True),
-                nn.BatchNorm2d(F_int),
+                nn.GroupNorm(groups, F_int),
             )
             self.W_l = nn.Sequential(
                 nn.Conv2d(F_l, F_int, kernel_size=1, bias=True),
-                nn.BatchNorm2d(F_int),
+                nn.GroupNorm(groups, F_int),
             )
             self.psi = nn.Sequential(
                 nn.Conv2d(F_int, 1, kernel_size=1, bias=True),
-                nn.BatchNorm2d(1),
+                nn.GroupNorm(1, 1),
                 nn.Sigmoid(),
             )
             self.relu = nn.ReLU(inplace=True)
@@ -1343,14 +1344,16 @@ def train_fold(
         shuffle=True,
         num_workers=config["training"]["num_workers"],
         pin_memory=torch.cuda.is_available(),
+        persistent_workers=(config["training"]["num_workers"] > 0),
         generator=torch.Generator().manual_seed(fold_seed),
     )
     validation_loader = torch.utils.data.DataLoader(
         validation_dataset,
         batch_size=config["inference"]["batch_size"],
         shuffle=False,
-        num_workers=0,
+        num_workers=config["training"]["num_workers"],
         pin_memory=torch.cuda.is_available(),
+        persistent_workers=(config["training"]["num_workers"] > 0),
     )
     base_channels = config["model"]["base_channels"]
     model = build_model(base_channels).to(device)

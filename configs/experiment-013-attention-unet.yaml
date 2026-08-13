@@ -49,11 +49,11 @@ training:
   target_strategy: hybrid-consensus-random-annotator
   consensus_weight: 0.75
   annotator_weight: 0.25
-  epochs: 18
+  epochs: 15
   minimum_epochs: 8
   early_stopping_patience: 4
   batch_size: 1
-  gradient_accumulation_steps: 2
+  gradient_accumulation_steps: 4
   learning_rate: 0.00015
   weight_decay: 0.0001
   tversky_alpha: 0.3
@@ -63,7 +63,7 @@ training:
   bce_positive_weight: 4.0
   distance_loss_weight: 0.5
   deep_supervision_weight: 0.3
-  num_workers: 0
+  num_workers: 2
   mixed_precision: true
   augmentations:
     horizontal_flip_probability: 0.5
@@ -84,15 +84,15 @@ inference:
 
 postprocessing:
   source: experiment-013-watershed
-  probability_threshold: 0.45
+  probability_threshold: 0.35
   watershed_enabled: true
-  watershed_seed_threshold: 0.30
+  watershed_seed_threshold: 0.25
   closing_kernel: 7
   closing_iterations: 1
   disk_erosion_pixels: 8
-  min_component_area_at_model_resolution: 96
+  min_component_area_at_model_resolution: 48
   max_component_area_at_model_resolution: 40000
-  minimum_component_mean_probability: 0.50
+  minimum_component_mean_probability: 0.40
   connectivity: 8
   matching_min_iou: 0.1
 

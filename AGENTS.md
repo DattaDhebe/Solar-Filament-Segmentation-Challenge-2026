@@ -44,3 +44,9 @@
 - Run Ruff and the synthetic test suite after code changes.
 - Do not commit, push, create a remote, or create a GitHub repository unless the
   user explicitly requests that action.
+
+- **Kaggle PyTorch Performance Invariants**: When generating or modifying Kaggle 
+  training scripts for PyTorch, you MUST:
+  1. Set `num_workers: 2` (or higher) for DataLoaders on GPU VMs. Never use 0.
+  2. Enable `persistent_workers=True` when `num_workers > 0`.
+  3. Set `torch.backends.cudnn.benchmark = True` if input dimensions are static.
